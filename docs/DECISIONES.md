@@ -24,13 +24,29 @@
 | 2026-10-23 | Vitest y suites separadas por tipo. | Distingue reglas puras, PostgreSQL real y HTTP real. |
 | 2026-10-23 | Deshabilitar autorregistro en `supabase/config.toml`. | Solo se permiten administradores creados explícitamente. |
 
+## Auditoría C0 y Bloque C1
+
+| Fecha | Decisión | Motivo |
+| --- | --- | --- |
+| 2026-10-23 | Sustituir PostgreSQL/PostgREST por archivos CSV/JSON locales. | El prototipo necesita persistencia demostrable sin Docker ni infraestructura externa. |
+| 2026-10-23 | Mantener una interfaz `OperationsRepository`. | Desacopla servicios y rutas de la fuente física. |
+| 2026-10-23 | Versionar templates y demo; ignorar `data/runtime`. | Separa datos reproducibles de datos operativos locales. |
+| 2026-10-23 | Usar ocho CSV por snapshot y `metadata.json`. | Conserva el contrato canónico con una estructura legible. |
+| 2026-10-23 | Usar `csv-parse` y `csv-stringify`. | Evita un parser manual incapaz de manejar comillas, comas o multilinea. |
+| 2026-10-23 | Validar cada fila y todas las relaciones con Zod. | Reemplaza para el prototipo los checks, unicidad y FKs que daba PostgreSQL. |
+| 2026-10-23 | Publicar snapshots mediante staging, relectura y `rename`. | Evita exponer cargas parciales y prohíbe sobrescrituras. |
+| 2026-10-23 | Conservar rutas y contratos HTTP del Bloque B. | Evita cambios para los compañeros del dashboard/importador. |
+| 2026-10-23 | Mantener Supabase sólo para Auth durante C1. | Los endpoints no pueden quedar públicos antes de implementar C2. |
+| 2026-10-23 | No persistir todavía eventos de simulación. | C1 cubre snapshots; la función pura sigue siendo la única capacidad implementada. |
+
 ## Diferencias registradas respecto al Bloque A
 
 El contrato preliminar se amplió con snapshots, reserva, simulaciones y eventos. `coordinadores` dejó de ser entidad separada, `inventario` pasó a `inventario_inicial` e `intenciones` a `donaciones_esperadas`. Estos cambios proceden del prompt aprobado del Bloque B y no borran el historial previo de Git.
 
 ## Pendientes reales
 
-- Aplicar y verificar la migración en Supabase local o en una instancia de desarrollo autorizada.
-- Ejecutar las suites PostgreSQL/RLS/HTTP autenticadas una vez disponible esa infraestructura.
-- Crear las cuentas administradoras reales mediante Supabase Auth antes de un despliegue futuro.
+- Ejecutar C2 únicamente con aprobación: sustituir Supabase Auth y retirar sus clientes, variables, scripts y RLS.
+- Rehacer las pruebas HTTP 401/403/200 con la autenticación de C2.
+- Retirar la migración y el seed SQL sólo después de verificar que no se pierde evidencia o datos necesarios.
+- Definir persistencia de eventos únicamente cuando se autorice la fase correspondiente; C1 no la declara implementada.
 

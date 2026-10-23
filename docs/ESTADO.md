@@ -2,35 +2,44 @@
 
 ## Fase actual
 
-Bloque B parcial al 2026-10-23. El código, migración, seed, endpoints y pruebas están preparados; falta ejecutar PostgreSQL/Supabase real porque Docker Desktop no pudo iniciar su motor local.
+Bloque C1 implementado al 2026-10-23. La persistencia operativa usa archivos CSV/JSON locales; las rutas y los contratos HTTP del Bloque B se conservan.
 
-## Completado y verificado
+## C1 implementado
 
-- Modelo relacional y RLS escritos como migración versionada.
-- Dos snapshots y dataset demostrativo determinista en `seed.sql`.
-- Clientes SSR, renovación de cookies y autorización administrativa.
-- Repositorios, servicios y cálculos puros.
-- Siete endpoints autorizados y página mínima de login.
-- Ocho pruebas unitarias aprobadas.
-- Lint, TypeScript y build de producción aprobados.
-- `/api/health` verificado con HTTP 200.
-- Acceso anónimo a `/api/snapshots` verificado con HTTP 401.
+- `OperationsRepository` desacopla los servicios de la tecnología de persistencia.
+- `CsvOperationsRepository` lee y escribe un bundle formado por `metadata.json` y ocho archivos CSV.
+- `data/templates/` define las cabeceras, `data/demo/snapshots/` contiene los dos snapshots demostrativos versionados y `data/runtime/` queda reservado para ejecución local e ignorado por Git.
+- La carga convierte y valida el bundle completo con esquemas Zod, incluyendo unicidad, referencias y valores controlados.
+- Las escrituras usan un directorio de staging y un rename final; no exponen un snapshot parcialmente escrito.
+- Los servicios y endpoints operativos ya no consultan Supabase/PostgREST. Las fórmulas y reglas de negocio no cambiaron.
+- La migración y el seed SQL quedan como legado y checkpoint reproducible del Bloque B, no como persistencia activa de C1.
 
-## Preparado pero no verificado contra PostgreSQL
+## Verificación registrada
 
-- Aplicación desde cero de la migración y el seed.
-- Restricciones SQL, aislamiento compuesto y reproducibilidad.
-- RLS para usuario no autorizado y administrador.
-- Lecturas HTTP autenticadas provenientes de PostgreSQL.
-- Respuesta 500 ante pérdida controlada de PostgREST.
+- Las tres suites reales de integración CSV aprobaron 25 pruebas mediante `npm run test:csv`.
+- Las dos suites antiguas de integración Supabase/PostgreSQL quedaron omitidas: 8 pruebas omitidas no equivalen a pruebas aprobadas.
+- `npm run lint`, `npm run typecheck` y `npm run build` aprobaron para C1.
+- Se conservan las ocho pruebas unitarias de dominio del Bloque B.
+- `GET /api/health` respondió HTTP 200 con `{ "data": { "status": "ok" }, "meta": {} }`.
+- `GET /api/snapshots` sin sesión respondió HTTP 401 con código `UNAUTHENTICATED`.
+- No se ejecutó una lectura HTTP administrativa con 200 porque requiere una sesión y cuenta Supabase reales.
 
-Las suites correspondientes se omiten automáticamente salvo que `RUN_SUPABASE_INTEGRATION=true`; una omisión no se considera aprobación.
+## Dependencias temporales
 
-## Bloqueo de entorno
+Supabase sigue siendo necesario únicamente para autenticación administrativa durante C1:
 
-Docker Desktop 4.80.0 falla al iniciar por un reparse point antiguo en `C:\Users\hoyos\AppData\Local\Docker\run\dockerInference`. Windows negó moverlo incluso con permisos ampliados. No se usó “Reset to factory defaults”, no se ejecutó `supabase db reset` y no se tocó ningún proyecto remoto.
+- login y sesión;
+- proxy y renovación de cookies;
+- tabla `administradores` y sus políticas RLS.
+
+Los endpoints protegidos continúan exigiendo una sesión Supabase válida. La sustitución de este mecanismo pertenece a C2 y no está implementada. Por ello tampoco se declara una lectura HTTP administrativa autenticada con 200 como verificada en C1.
+
+## Limitaciones conocidas
+
+- La persistencia de eventos de simulación no forma parte de C1; la simulación continúa como cálculo puro.
+- `data/runtime/` es almacenamiento local pensado para una sola instancia del proceso, no para concurrencia distribuida.
+- No se han iniciado importación Excel, interfaz visual ni dashboard interactivo.
 
 ## Siguiente microbloque
 
-Recuperar Docker Desktop fuera de este repositorio o proporcionar credenciales de una instancia Supabase de desarrollo aislada. Después: iniciar Supabase local, ejecutar `npm run supabase:reset`, cargar fixtures de Auth y correr las suites de integración y HTTP. No iniciar importación Excel ni dashboard visual sin nueva aprobación.
-
+Completar la verificación HTTP administrativa pendiente cuando exista una sesión Supabase real. No iniciar C2 ni retirar los componentes temporales de Supabase sin aprobación explícita.

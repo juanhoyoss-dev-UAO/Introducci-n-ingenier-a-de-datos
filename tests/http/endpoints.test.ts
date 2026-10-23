@@ -101,7 +101,7 @@ describe.runIf(integrationIsEnabled())("HTTP real", () => {
     expect(administrator.body.data).toHaveLength(2);
   });
 
-  it("T08 consulta snapshots, seis centros, productos y tiempos desde PostgreSQL", async () => {
+  it("consulta snapshots, seis centros, productos y tiempos desde CSV", async () => {
     const snapshots = await request<ApiSuccess<Array<{ id: string }>>>(
       "/api/snapshots",
       administratorCookie,

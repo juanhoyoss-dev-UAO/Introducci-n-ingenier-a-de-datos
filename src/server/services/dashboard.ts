@@ -1,5 +1,3 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-
 import {
   calculateDeficit,
   calculateMissingVolunteers,
@@ -10,14 +8,17 @@ import {
   recommendTransfers,
   type CenterProductBalance,
 } from "@/domain/transfers";
-import { getDashboardSource } from "@/server/repositories/operations";
+import {
+  getOperationsRepository,
+  type OperationsRepository,
+} from "@/server/repositories/operations";
 import { ApiError } from "./errors";
 
 export async function getDashboard(
-  supabase: SupabaseClient,
   snapshotId: string,
+  repository: OperationsRepository = getOperationsRepository(),
 ) {
-  const source = await getDashboardSource(supabase, snapshotId);
+  const source = await repository.getDashboardSource(snapshotId);
   if (!source.snapshot) {
     throw new ApiError(404, "SNAPSHOT_NOT_FOUND", "El snapshot no existe.");
   }

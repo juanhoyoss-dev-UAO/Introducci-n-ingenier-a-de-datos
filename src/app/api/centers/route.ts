@@ -6,11 +6,11 @@ import {
 } from "@/server/services/http";
 
 export async function GET(request: Request) {
-  return withAdministrator(async (supabase) => {
+  return withAdministrator(async () => {
     const snapshotId = parseSnapshotId(
       new URL(request.url).searchParams.get("snapshotId"),
     );
-    const centers = await getCenters(supabase, snapshotId);
+    const centers = await getCenters(snapshotId);
     return successResponse(centers, {
       snapshot_id: snapshotId,
       total: centers.length,

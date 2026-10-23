@@ -1,0 +1,7 @@
+snapshot_id,centro_id,nombre,estado,zona,coordinador_nombre
+10000000-0000-4000-8000-000000000001,C01,Centro Norte,activo,Norte,Coordinador Norte
+10000000-0000-4000-8000-000000000001,C02,Centro Sur,activo,Sur,Coordinador Sur
+10000000-0000-4000-8000-000000000001,C03,Centro Oriente,activo,Oriente,Coordinador Oriente
+10000000-0000-4000-8000-000000000001,C04,Centro Occidente,activo,Occidente,Coordinador Occidente
+10000000-0000-4000-8000-000000000001,C05,Centro Centro,activo,Centro,Coordinador Centro
+10000000-0000-4000-8000-000000000001,C06,Centro Ladera,activo,Ladera,Coordinador Ladera

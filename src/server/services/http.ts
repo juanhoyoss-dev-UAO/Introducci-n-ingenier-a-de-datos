@@ -1,4 +1,3 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 
 import type {
@@ -76,11 +75,11 @@ function errorResponse(error: unknown) {
 }
 
 export async function withAdministrator(
-  action: (supabase: SupabaseClient) => Promise<NextResponse>,
+  action: () => Promise<NextResponse>,
 ) {
   try {
-    const { supabase } = await requireAdministrator();
-    return await action(supabase);
+    await requireAdministrator();
+    return await action();
   } catch (error) {
     return errorResponse(error);
   }

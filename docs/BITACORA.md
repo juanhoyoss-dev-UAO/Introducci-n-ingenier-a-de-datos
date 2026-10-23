@@ -42,3 +42,40 @@
 - TypeScript, ESLint y build con webpack fueron aprobados.
 - No se declaró como aprobada ninguna prueba no ejecutada.
 
+## 2026-10-23 — Auditoría C0 y checkpoint
+
+- Se auditó el acoplamiento a Supabase/PostgreSQL y se delimitó la migración de persistencia sin cambiar contratos ni reglas de negocio.
+- El Bloque B quedó preservado en la rama `codex/c1-csv-persistence`, commit `16553db246a627fdd0227c074aac081f0f64f4b3` (`checkpoint: bloque B backend Supabase`).
+- La migración y el seed SQL se conservaron como evidencia histórica y referencia del dataset, no como fuente operativa de C1.
+
+## 2026-10-23 — Bloque C1
+
+### C1.1 — Persistencia CSV/JSON
+
+- Se introdujo `OperationsRepository` y una implementación `CsvOperationsRepository` para retirar las consultas operativas a Supabase/PostgREST.
+- Cada snapshot se almacena como `metadata.json` más ocho archivos CSV.
+- Se versionaron cabeceras en `data/templates/` y dos snapshots deterministas en `data/demo/snapshots/`.
+- `data/runtime/` quedó ignorado por Git para datos locales mutables.
+
+### C1.2 — Integridad y escritura
+
+- Esquemas Zod validan tipos, valores controlados, unicidad y referencias del bundle completo.
+- Las escrituras se preparan en staging y se publican mediante rename para evitar snapshots parciales.
+- Se añadieron controles de identificadores, rutas y enlaces simbólicos.
+
+### C1.3 — Servicios, API y Auth
+
+- Los servicios y Route Handlers conservan las fórmulas, endpoints y envolturas de respuesta existentes, pero leen la persistencia CSV/JSON.
+- Supabase permanece temporalmente solo para login, sesión, proxy, tabla `administradores` y RLS hasta C2.
+- Los endpoints protegidos todavía requieren Supabase Auth; no se declaró un HTTP 200 administrativo autenticado.
+- La persistencia de eventos de simulación no se añadió: el cálculo sigue siendo puro.
+
+### C1.4 — Verificación
+
+- `npm run test:csv` aprobó 3 archivos y 25 pruebas reales sobre la persistencia CSV.
+- Las dos suites legadas de Supabase/PostgreSQL permanecieron omitidas, con 8 pruebas omitidas.
+- `npm run lint`, `npm run typecheck` y `npm run build` aprobaron.
+- `GET /api/health` respondió HTTP 200 con `{ "data": { "status": "ok" }, "meta": {} }`.
+- `GET /api/snapshots` sin sesión respondió HTTP 401 con código `UNAUTHENTICATED`.
+- No se ejecutó un HTTP 200 administrativo autenticado porque requiere una sesión y cuenta Supabase reales.
+- Ninguna prueba omitida o no ejecutada se contó como aprobada.

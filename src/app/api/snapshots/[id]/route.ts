@@ -11,7 +11,7 @@ export async function GET(
   _request: Request,
   context: SnapshotRouteContext,
 ) {
-  return withAdministrator(async (supabase) => {
+  return withAdministrator(async () => {
     const { id } = await context.params;
     const result = snapshotIdSchema.safeParse(id);
     if (!result.success) {
@@ -23,7 +23,7 @@ export async function GET(
       );
     }
 
-    const snapshot = await getSnapshot(supabase, result.data);
+    const snapshot = await getSnapshot(result.data);
     return successResponse(snapshot);
   });
 }
