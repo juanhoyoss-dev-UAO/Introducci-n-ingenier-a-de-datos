@@ -1,72 +1,103 @@
-
 # Redes de Ayuda
 
-Prototipo académico para la coordinación de centros de acopio en Cali. El repositorio se encuentra en el Bloque A: contiene la base de Next.js y la documentación inicial, pero todavía no implementa autenticación, persistencia, importaciones, dashboard ni simulaciones.
+Backend académico para coordinar centros de acopio en Cali. El Bloque B incluye modelo relacional, migraciones Supabase, datos demostrativos, autenticación administrativa, endpoints de lectura y reglas de inventario. No incluye importador Excel, dashboard visual ni motor interactivo de simulación.
 
 ## Requisitos
 
-- Node.js 20.9 o superior. La configuración inicial fue verificada con Node.js 24.
-- npm 11 o una versión compatible con la instalación de Node.js.
+- Node.js 24 recomendado; Next.js requiere 20.9 o superior.
+- npm.
+- Docker Desktop funcionando.
 - Git.
-
-No se requieren credenciales ni variables de entorno para el Bloque A. Los archivos `.env*` están ignorados para evitar versionar secretos; cuando una fase posterior necesite configuración se deberá añadir un `.env.example` sin valores reales.
 
 ## Instalación
 
 ```bash
 git clone https://github.com/juanhoyoss-dev-UAO/Introducci-n-ingenier-a-de-datos.git
 cd Introducci-n-ingenier-a-de-datos
-npm install
+npm ci
 ```
 
-`npm install` usa `package-lock.json` para resolver las mismas versiones verificadas. En automatización o instalaciones completamente reproducibles puede utilizarse `npm ci`.
+## Supabase local
 
-## Ejecución
+```bash
+npm run supabase:start
+npm run supabase:reset
+npx supabase status -o env
+```
+
+`supabase:reset` incluye `--local`: reconstruye únicamente la base local descartable, aplica las migraciones y carga `supabase/seed.sql`. No utilizar `--linked` sin autorización expresa.
+
+Copiar `.env.example` como `.env.local` y mapear la salida de `supabase status`:
+
+```dotenv
+NEXT_PUBLIC_SUPABASE_URL=<API_URL>
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<PUBLISHABLE_KEY-o-ANON_KEY-local>
+RUN_SUPABASE_INTEGRATION=true
+SUPABASE_TEST_URL=<API_URL>
+SUPABASE_TEST_PUBLISHABLE_KEY=<PUBLISHABLE_KEY-o-ANON_KEY-local>
+SUPABASE_TEST_SERVICE_ROLE_KEY=<SERVICE_ROLE_KEY-local>
+TEST_BASE_URL=http://127.0.0.1:3000
+```
+
+No versionar `.env.local`. La service role es exclusiva de fixtures de pruebas locales y nunca debe llegar al navegador ni usarse en las consultas normales.
+
+## Pruebas
+
+```bash
+npm run test:unit
+npm run test:integration
+npm run lint
+npm run typecheck
+npm run build
+```
+
+Las pruebas de integración se omiten si `RUN_SUPABASE_INTEGRATION` no es `true`. Una prueba omitida no equivale a aprobada. La suite de integración crea dos usuarios locales reproducibles:
+
+- Administrador: `admin@redes-ayuda.local`
+- Usuario no autorizado: `usuario@redes-ayuda.local`
+- Contraseña local compartida: `RedesAyuda-Local-2026!`
+
+Para la suite HTTP, mantener la aplicación ejecutándose en otra terminal:
+
+```bash
+npm run dev
+npm run test:http
+```
+
+## Ejecución y login
 
 ```bash
 npm run dev
 ```
 
-Abrir `http://localhost:3000`. La página debe mostrar “Redes de Ayuda” y “Prototipo académico de coordinación de centros de acopio”.
+Abrir `http://localhost:3000/login` e iniciar sesión con el administrador local creado por las pruebas. La aplicación no ofrece autorregistro.
 
-Para una ejecución de producción local:
+## Consultar la API
 
-```bash
-npm run build
-npm run start
-```
+Primero consultar `GET /api/snapshots` con la sesión administrativa y copiar un `id`. Después utilizarlo como `snapshotId`:
 
-## Verificaciones
+- `GET /api/health`
+- `GET /api/snapshots`
+- `GET /api/snapshots/{id}`
+- `GET /api/centers?snapshotId={id}`
+- `GET /api/products?snapshotId={id}`
+- `GET /api/travel-times?snapshotId={id}`
+- `GET /api/dashboard?snapshotId={id}`
 
-```bash
-npm run lint
-npm run typecheck
-npm run build
-git diff --check
-```
+El snapshot demostrativo principal es `10000000-0000-4000-8000-000000000001`. Las rutas operativas usan las cookies creadas por el login; una solicitud anónima recibe 401.
 
-## Estructura general
+## Estructura y colaboración
 
-- `src/app`: rutas y páginas de Next.js.
-- `src/features`: módulos funcionales futuros.
-- `src/server`: servicios backend y acceso futuro a datos.
-- `src/contracts`: esquemas y tipos compartidos futuros.
-- `src/domain`: reglas de negocio puras futuras.
-- `src/components`: componentes visuales reutilizables.
-- `src/lib`: utilidades compartidas.
-- `data`: plantillas y datos de demostración futuros.
-- `supabase`: migraciones futuras, no creadas todavía.
-- `docs`: arquitectura, datos, API, decisiones, estado y bitácora.
-- `tests`: pruebas automatizadas futuras.
+- `src/app/api`: contratos HTTP implementados; reservado al líder técnico salvo coordinación.
+- `src/server`: autenticación, acceso a datos y servicios; reservado al líder técnico.
+- `src/contracts` y `src/domain`: tipos y fórmulas reutilizables; cambiar solo con revisión.
+- `supabase`: esquema, RLS y seed; no modificar ni aplicar remotamente sin autorización.
+- `tests`: pruebas unitarias, PostgreSQL y HTTP.
+- `src/features/imports`: punto futuro para el compañero del importador Excel.
+- `src/features/dashboard`: punto futuro para el compañero del dashboard visual.
 
-Consulte `docs/ARQUITECTURA.md` para las responsabilidades completas y `docs/ESTADO.md` antes de iniciar una tarea.
+Los compañeros deben consumir los endpoints y funciones existentes; no deben duplicar fórmulas dentro de componentes React. Antes de cada tarea se deben leer `AGENTS.md` y `docs/ESTADO.md`.
 
-## Flujo básico de Git para colaboradores
+## Estado conocido
 
-1. Actualizar la rama local y comprobar `git status`.
-2. Crear una rama corta para el microbloque autorizado.
-3. Realizar cambios mínimos y ejecutar las verificaciones proporcionales.
-4. Revisar `git diff` y confirmar que no contiene secretos ni trabajo ajeno.
-5. Solicitar revisión antes de integrar. No avanzar al siguiente bloque sin aprobación.
-
-No se debe hacer `push`, desplegar ni modificar la arquitectura o el contrato de datos sin la coordinación del equipo.
+El código, las pruebas unitarias y el build están verificados. En el entorno donde se implementó el Bloque B, Docker Desktop no pudo iniciar por un socket local obsoleto; por ello las migraciones y pruebas autenticadas no se declararon aprobadas. Consulte `docs/PRUEBAS_B.md` para la evidencia exacta.

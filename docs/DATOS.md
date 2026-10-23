@@ -1,96 +1,50 @@
 # Datos
 
-## Principios del contrato
+## Contrato vigente del Bloque B
 
-Los archivos externos, incluidos los Excel, pueden utilizar encabezados y formatos diferentes. Cada importación futura deberá mapear sus columnas de forma explícita hacia un formato interno estándar. Nunca se inventarán equivalencias, identificadores ni cantidades cuando la fuente no los proporcione o el mapeo no haya sido aprobado.
+El contrato preliminar del Bloque A quedó aprobado y ampliado por el Bloque B. Los archivos externos futuros podrán tener encabezados diferentes, pero deberán mapearse explícitamente a este contrato. Nunca se inventarán equivalencias, identificadores ni cantidades.
 
-Una importación válida creará un snapshot independiente y trazable. Las intenciones de donación representan cantidades esperadas y nunca se suman al inventario confirmado. Los traslados serán recomendaciones, no movimientos automáticos. Estas reglas se documentan ahora, pero todavía no están implementadas.
+Cada importación válida creará un snapshot nuevo. Los códigos se interpretan junto con `snapshot_id`; seis centros son únicamente el dataset inicial. Los paquetes son enteros, los tiempos son dirigidos y las donaciones esperadas nunca se suman al inventario confirmado.
 
-Los paquetes se expresan como números enteros de una presentación. Cada presentación establece `contenido_por_paquete` en la unidad base de su producto. El dataset inicial tendrá seis centros ficticios, pero el código no impondrá seis como límite. Los tiempos de traslado son dirigidos: el tiempo de A a B puede ser distinto del tiempo de B a A.
-
-## Contrato interno preliminar
-
-Todos los campos y entidades siguientes son preliminares y deben aprobarse antes de crear tablas o migraciones.
-
-### centros
-
-| Campo | Significado preliminar |
+| Entidad | Campos canónicos |
 | --- | --- |
-| `centro_id` | Identificador interno del centro. |
-| `nombre` | Nombre legible del centro. |
-| `estado` | Estado operativo del centro. |
+| `snapshots` | `id`, `nombre`, `created_at`, `descripcion` |
+| `centros` | `snapshot_id`, `centro_id`, `nombre`, `estado`, `zona`, `coordinador_nombre` |
+| `productos` | `snapshot_id`, `producto_id`, `nombre`, `unidad_base` |
+| `presentaciones` | `snapshot_id`, `sku_id`, `producto_id`, `nombre`, `contenido_por_paquete` |
+| `inventario_inicial` | `snapshot_id`, `centro_id`, `sku_id`, `cantidad_paquetes` |
+| `necesidades` | `snapshot_id`, `centro_id`, `producto_id`, `objetivo_unidad_base`, `reserva_unidad_base`, `prioridad` |
+| `voluntarios` | `snapshot_id`, `centro_id`, `disponibles`, `requeridos` |
+| `tiempos_traslado` | `snapshot_id`, `origen_id`, `destino_id`, `minutos` |
+| `donaciones_esperadas` | `snapshot_id`, `intencion_id`, `centro_id`, `sku_id`, `cantidad_paquetes`, `llegada_prevista`, `estado` |
+| `simulaciones` | `id`, `snapshot_id`, `nombre`, `hora_inicio`, `hora_actual`, `estado` |
+| `eventos_simulacion` | `id`, `simulacion_id`, `tipo`, `ocurrido_en`, `registrado_en`, `payload` |
 
-### coordinadores
+La tabla técnica `administradores` contiene `user_id`, vinculado con `auth.users`, y `created_at`.
 
-| Campo | Significado preliminar |
-| --- | --- |
-| `coordinador_id` | Identificador interno del coordinador. |
-| `centro_id` | Centro al que está asociado. |
-| `nombre` | Nombre del coordinador. |
+## Valores controlados
 
-### productos
+- `unidad_base`: `ml`, `g` o `unidad`.
+- `prioridad`: 1 alta, 2 media, 3 baja.
+- `donaciones_esperadas.estado`: `pendiente`, `recibida` o `cancelada`.
+- `simulaciones.estado`: `activa` o `finalizada`.
+- `eventos_simulacion.tipo`: `recepcion_confirmada`, `cambio_necesidad` o `cambio_voluntarios`.
 
-| Campo | Significado preliminar |
-| --- | --- |
-| `producto_id` | Identificador del producto normalizado. |
-| `nombre` | Nombre legible del producto. |
-| `unidad_base` | Unidad en la que se comparan existencias y necesidades. |
+Los contratos TypeScript están en `src/contracts`; el detalle relacional se encuentra en `docs/MODELO_ER.md` y las fórmulas en `docs/REGLAS_NEGOCIO.md`.
 
-### presentaciones
+## Cambios respecto al contrato preliminar
 
-| Campo | Significado preliminar |
-| --- | --- |
-| `sku_id` | Identificador de la presentación. |
-| `producto_id` | Producto al que pertenece. |
-| `contenido_por_paquete` | Cantidad de unidad base contenida en un paquete. |
+- El coordinador de demostración se almacena en `centros.coordinador_nombre`; no es usuario autenticado ni tabla funcional independiente.
+- `inventario` se concretó como `inventario_inicial` para distinguir el estado base de cada simulación.
+- `intenciones` se concretó como `donaciones_esperadas`.
+- Se incorporaron snapshots, simulaciones, eventos y reserva de necesidad.
+- Todos los identificadores dependientes incluyen aislamiento por snapshot mediante claves compuestas.
 
-### inventario
+El historial del contrato preliminar permanece en Git; este documento describe el contrato vigente.
 
-| Campo | Significado preliminar |
-| --- | --- |
-| `centro_id` | Centro que confirma la existencia. |
-| `sku_id` | Presentación almacenada. |
-| `cantidad_paquetes` | Número entero de paquetes confirmados. |
+## Datos semilla
 
-### necesidades
+`supabase/seed.sql` contiene dos snapshots deterministas. El snapshot A tiene seis centros, cinco productos, siete presentaciones, inventario, necesidades, voluntarios, tiempos dirigidos, donaciones y dos simulaciones. El snapshot B reutiliza `C01` con inventario distinto e incluye `AGUA-330`, exclusivo de ese snapshot para probar referencias cruzadas inválidas.
 
-| Campo | Significado preliminar |
-| --- | --- |
-| `centro_id` | Centro que registra la necesidad. |
-| `producto_id` | Producto requerido. |
-| `objetivo_unidad_base` | Objetivo expresado en la unidad base del producto. |
-| `prioridad` | Nivel de prioridad por definir. |
-
-### voluntarios
-
-| Campo | Significado preliminar |
-| --- | --- |
-| `centro_id` | Centro al que corresponde el conteo. |
-| `disponibles` | Cantidad de voluntarios disponibles. |
-| `requeridos` | Cantidad de voluntarios requeridos. |
-
-### tiempos
-
-| Campo | Significado preliminar |
-| --- | --- |
-| `origen_id` | Centro de origen. |
-| `destino_id` | Centro de destino. |
-| `minutos` | Tiempo dirigido de traslado en minutos. |
-
-### intenciones
-
-| Campo | Significado preliminar |
-| --- | --- |
-| `intencion_id` | Identificador de la intención esperada. |
-| `centro_id` | Centro receptor previsto. |
-| `sku_id` | Presentación ofrecida. |
-| `cantidad_paquetes` | Número entero de paquetes esperados. |
-| `llegada_prevista` | Fecha y hora estimadas de llegada. |
-
-## Pendientes de aprobación
-
-- Tipos SQL, nulabilidad, claves, estados permitidos y reglas de unicidad.
-- Metadatos de origen, auditoría y composición de cada snapshot.
-- Reglas de validación de unidades, prioridades y fechas.
-- Catálogo de mapeos por cada formato externo real.
+No se utiliza información personal real. Los usuarios de autenticación para pruebas se crean temporalmente mediante la API administrativa del Supabase local y no forman parte del seed operativo.
 

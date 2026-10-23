@@ -2,40 +2,35 @@
 
 ## Fase actual
 
-Bloque A completado el 2026-10-23. El proyecto queda detenido a la espera de aprobación; no se ha iniciado el Bloque B.
+Bloque B parcial al 2026-10-23. El código, migración, seed, endpoints y pruebas están preparados; falta ejecutar PostgreSQL/Supabase real porque Docker Desktop no pudo iniciar su motor local.
 
-## Completado
+## Completado y verificado
 
-- Inspección inicial del repositorio, Git y herramientas locales.
-- Configuración base de Next.js con App Router, TypeScript, Tailwind CSS y ESLint.
-- Página inicial mínima de Redes de Ayuda.
-- Estructura modular reservada.
-- Documentación inicial de arquitectura, datos, API, decisiones y colaboración.
-- Dependencias locales instaladas y `package-lock.json` generado.
-- Lint, comprobación de tipos y build de producción ejecutados correctamente.
-- Servidor de desarrollo verificado con respuesta HTTP 200 y contenido esperado.
+- Modelo relacional y RLS escritos como migración versionada.
+- Dos snapshots y dataset demostrativo determinista en `seed.sql`.
+- Clientes SSR, renovación de cookies y autorización administrativa.
+- Repositorios, servicios y cálculos puros.
+- Siete endpoints autorizados y página mínima de login.
+- Ocho pruebas unitarias aprobadas.
+- Lint, TypeScript y build de producción aprobados.
+- `/api/health` verificado con HTTP 200.
+- Acceso anónimo a `/api/snapshots` verificado con HTTP 401.
 
-## Pendientes de aprobación
+## Preparado pero no verificado contra PostgreSQL
 
-- Aprobar el inicio y alcance del siguiente microbloque.
-- Aprobar el contrato preliminar antes de crear cualquier tabla o migración.
+- Aplicación desde cero de la migración y el seed.
+- Restricciones SQL, aislamiento compuesto y reproducibilidad.
+- RLS para usuario no autorizado y administrador.
+- Lecturas HTTP autenticadas provenientes de PostgreSQL.
+- Respuesta 500 ante pérdida controlada de PostgREST.
 
-## Restricciones vigentes
+Las suites correspondientes se omiten automáticamente salvo que `RUN_SUPABASE_INTEGRATION=true`; una omisión no se considera aprobación.
 
-- No implementar autenticación, Supabase, migraciones, importación de Excel, dashboard, simulaciones ni reglas de negocio.
-- No crear datos ficticios en componentes.
-- No usar intenciones esperadas como inventario confirmado.
-- No realizar commits, push ni despliegues sin autorización.
+## Bloqueo de entorno
+
+Docker Desktop 4.80.0 falla al iniciar por un reparse point antiguo en `C:\Users\hoyos\AppData\Local\Docker\run\dockerInference`. Windows negó moverlo incluso con permisos ampliados. No se usó “Reset to factory defaults”, no se ejecutó `supabase db reset` y no se tocó ningún proyecto remoto.
 
 ## Siguiente microbloque
 
-Tras cerrar el Bloque A, detenerse y solicitar aprobación antes de definir o iniciar el Bloque B.
-
-## Verificación de cierre
-
-- `npm run lint`: aprobado.
-- `npm run typecheck`: aprobado.
-- `npm run build`: aprobado con webpack.
-- Servidor de desarrollo: HTTP 200 y textos esperados confirmados.
-- Turbopack: se reprodujo un fallo interno al iniciar PostCSS en Windows/Node 24; se adoptó webpack como decisión de compatibilidad del Bloque A.
+Recuperar Docker Desktop fuera de este repositorio o proporcionar credenciales de una instancia Supabase de desarrollo aislada. Después: iniciar Supabase local, ejecutar `npm run supabase:reset`, cargar fixtures de Auth y correr las suites de integración y HTTP. No iniciar importación Excel ni dashboard visual sin nueva aprobación.
 

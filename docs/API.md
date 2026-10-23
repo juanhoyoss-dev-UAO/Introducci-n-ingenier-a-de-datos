@@ -1,24 +1,67 @@
 # API
 
-## Estado
+## Convenciones implementadas
 
-No hay endpoints implementados en el Bloque A. `src/app/api` es únicamente una ubicación reservada y no contiene archivos `route.ts`.
+Las respuestas exitosas tienen la forma `{ "data": ..., "meta": ... }`. Los errores usan `{ "error": { "code": "...", "message": "...", "details": ... } }`. Las rutas no devuelven trazas, credenciales ni mensajes internos de PostgreSQL.
 
-## Convenciones futuras propuestas
+`/api/health` es público. Los demás endpoints requieren una sesión Supabase verificada y una fila correspondiente en `administradores`: anónimo devuelve 401 y usuario autenticado no autorizado devuelve 403.
 
-Estas convenciones deberán confirmarse antes de implementar la API:
+| Método | Ruta | Autorización | Resultado |
+| --- | --- | --- | --- |
+| GET | `/api/health` | Pública | Estado básico. |
+| GET | `/api/snapshots` | Administrador | Lista de snapshots. |
+| GET | `/api/snapshots/[id]` | Administrador | Detalle o 404. |
+| GET | `/api/centers?snapshotId=...` | Administrador | Centros del snapshot. |
+| GET | `/api/products?snapshotId=...` | Administrador | Productos con presentaciones. |
+| GET | `/api/travel-times?snapshotId=...` | Administrador | Tiempos dirigidos. |
+| GET | `/api/dashboard?snapshotId=...` | Administrador | Métricas calculadas y candidatos de traslado. |
 
-- Usar rutas bajo `/api` y versionar con `/api/v1` cuando exista un contrato público estable.
-- Nombrar recursos con sustantivos en plural y utilizar los métodos HTTP según su semántica.
-- Intercambiar JSON en UTF-8 y fechas en ISO 8601 con zona horaria explícita.
-- Validar toda entrada en el límite HTTP mediante contratos compartidos.
-- Mantener controladores delgados: la coordinación irá a servicios y la persistencia a repositorios.
-- Tratar una importación como una operación que produce un snapshot nuevo; no sobrescribir snapshots anteriores.
-- No mezclar intenciones esperadas con inventario confirmado en una respuesta agregada sin distinguirlos expresamente.
+No existen endpoints de escritura, importación, avance de simulación o recepción de donaciones.
 
-## Formato preliminar de respuestas
+## Ejemplos
 
-Una respuesta exitosa expondrá `data` y podrá incluir `meta` para paginación o trazabilidad. Un error expondrá un código estable, un mensaje seguro para el usuario y, cuando corresponda, detalles de validación por campo. No se publicarán trazas, secretos ni detalles de infraestructura.
+Health:
 
-Los códigos HTTP, nombres concretos de endpoints, esquemas y reglas de idempotencia siguen pendientes de aprobación. Este documento no constituye una implementación.
+```json
+{
+  "data": { "status": "ok" },
+  "meta": {}
+}
+```
+
+Error por parámetro ausente:
+
+```json
+{
+  "error": {
+    "code": "MISSING_SNAPSHOT_ID",
+    "message": "El parámetro snapshotId es obligatorio."
+  }
+}
+```
+
+Fragmento de `/api/dashboard` para `C01` y agua del snapshot A:
+
+```json
+{
+  "producto_id": "P01",
+  "unidad_base": "ml",
+  "inventario_confirmado_unidad_base": 12000,
+  "objetivo_unidad_base": 20000,
+  "deficit_confirmado_unidad_base": 8000,
+  "donaciones_esperadas_unidad_base": 6000
+}
+```
+
+El dashboard incluye `centros`, `donaciones_esperadas` y `candidatos_traslado`. Cada candidato identifica producto, origen, destino, minutos, paquetes completos por SKU y total en unidad base. La respuesta no modifica el inventario.
+
+## Códigos de error
+
+| HTTP | Código | Uso |
+| --- | --- | --- |
+| 400 | `MISSING_SNAPSHOT_ID`, `INVALID_SNAPSHOT_ID` | Parámetro ausente o inválido. |
+| 401 | `UNAUTHENTICATED` | Sesión ausente o inválida. |
+| 403 | `FORBIDDEN` | Usuario autenticado sin autorización administrativa. |
+| 404 | `SNAPSHOT_NOT_FOUND` | UUID válido que no existe o no es visible. |
+| 500 | `AUTH_SERVICE_ERROR`, `DATABASE_ERROR`, `INTERNAL_ERROR` | Fallo controlado sin detalles sensibles. |
 
