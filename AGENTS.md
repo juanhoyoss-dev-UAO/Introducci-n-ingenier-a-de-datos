@@ -19,6 +19,7 @@
 - Ejecutar pruebas proporcionales al cambio y reportar únicamente resultados reales.
 - No crear pruebas vacías o falsas para obtener resultados exitosos.
 - Después de cada tarea, entregar un informe estructurado por archivo que incluya decisiones, verificaciones y pendientes.
+- Entregar cada resumen de ejecución como un archivo PDF descargable, además de cualquier mensaje breve de acompañamiento en el chat.
 - No realizar `commit`, `push`, despliegues ni operaciones Git destructivas sin autorización.
 
 

@@ -1,0 +1,2 @@
+snapshot_id,intencion_id,centro_id,sku_id,cantidad_paquetes,llegada_prevista,estado
+10000000-0000-4000-8000-000000000002,D01,C01,AGUA-330,5,2026-10-15T11:00:00-05:00,pendiente

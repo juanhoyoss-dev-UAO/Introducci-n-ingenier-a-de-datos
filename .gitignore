@@ -11,6 +11,9 @@
 # Test and coverage output
 /coverage
 
+# Operational CSV/JSON data (demo and templates remain versioned)
+/data/runtime/
+
 # Local tooling and operating-system files
 .DS_Store
 Thumbs.db
@@ -23,7 +26,6 @@ yarn-error.log*
 pnpm-debug.log*
 
 # Local environment variables (never version secrets)
-.env*
 !.env.example
 
 # Vercel
