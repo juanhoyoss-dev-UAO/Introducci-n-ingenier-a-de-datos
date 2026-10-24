@@ -13,14 +13,9 @@
     "test:integration": "vitest run tests/integration",
     "test:csv": "vitest run tests/integration/csv-repository.test.ts tests/integration/csv-safety.test.ts tests/integration/csv-validation.test.ts",
     "test:http": "vitest run tests/http",
-    "supabase:start": "supabase start",
-    "supabase:stop": "supabase stop",
-    "supabase:reset": "supabase db reset --local",
-    "supabase:test:db": "supabase test db"
+    "auth:hash": "node scripts/generate-admin-password-hash.mjs"
   },
   "dependencies": {
-    "@supabase/ssr": "0.12.7",
-    "@supabase/supabase-js": "2.118.0",
     "csv-parse": "7.0.3",
     "csv-stringify": "6.9.0",
     "next": "16.4.3",
@@ -35,7 +30,6 @@
     "@types/react-dom": "^19",
     "eslint": "^10",
     "eslint-config-next": "16.4.3",
-    "supabase": "2.122.0",
     "tailwindcss": "^4.3.3",
     "typescript": "^5",
     "vitest": "5.0.5"

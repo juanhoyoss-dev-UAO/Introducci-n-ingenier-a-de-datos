@@ -2,44 +2,52 @@
 
 ## Fase actual
 
-Bloque C1 implementado al 2026-10-23. La persistencia operativa usa archivos CSV/JSON locales; las rutas y los contratos HTTP del Bloque B se conservan.
+Bloque C2 **COMPLETO** al 2026-10-23. La persistencia operativa continúa en CSV/JSON y la autenticación administrativa es local. El recorrido administrador → sesión verificada → endpoint → servicio → repositorio CSV → respuesta HTTP quedó demostrado sin Supabase, PostgreSQL, Docker ni servicios externos.
 
-## C1 implementado
+## C1 preservado
 
 - `OperationsRepository` desacopla los servicios de la tecnología de persistencia.
-- `CsvOperationsRepository` lee y escribe un bundle formado por `metadata.json` y ocho archivos CSV.
-- `data/templates/` define las cabeceras, `data/demo/snapshots/` contiene los dos snapshots demostrativos versionados y `data/runtime/` queda reservado para ejecución local e ignorado por Git.
-- La carga convierte y valida el bundle completo con esquemas Zod, incluyendo unicidad, referencias y valores controlados.
-- Las escrituras usan un directorio de staging y un rename final; no exponen un snapshot parcialmente escrito.
-- Los servicios y endpoints operativos ya no consultan Supabase/PostgREST. Las fórmulas y reglas de negocio no cambiaron.
-- La migración y el seed SQL quedan como legado y checkpoint reproducible del Bloque B, no como persistencia activa de C1.
+- `CsvOperationsRepository` lee y escribe `metadata.json` y ocho archivos CSV por snapshot.
+- `data/templates/` define cabeceras, `data/demo/snapshots/` conserva dos snapshots reproducibles y `data/runtime/` queda ignorado por Git.
+- Zod valida tipos, unicidad, referencias y valores controlados.
+- Staging y `rename` impiden publicar snapshots parciales o sobrescribir UUID existentes.
+- Las fórmulas y contratos HTTP operativos no cambiaron en C2.
 
-## Verificación registrada
+## C2 implementado
 
-- Las tres suites reales de integración CSV aprobaron 25 pruebas mediante `npm run test:csv`.
-- Las dos suites antiguas de integración Supabase/PostgreSQL quedaron omitidas: 8 pruebas omitidas no equivalen a pruebas aprobadas.
-- `npm run lint`, `npm run typecheck` y `npm run build` aprobaron para C1.
-- Se conservan las ocho pruebas unitarias de dominio del Bloque B.
-- `GET /api/health` respondió HTTP 200 con `{ "data": { "status": "ok" }, "meta": {} }`.
-- `GET /api/snapshots` sin sesión respondió HTTP 401 con código `UNAUTHENTICATED`.
-- No se ejecutó una lectura HTTP administrativa con 200 porque requiere una sesión y cuenta Supabase reales.
+- `ADMIN_USERNAME`, `ADMIN_PASSWORD_HASH` y `SESSION_SECRET` sustituyen la cuenta externa.
+- La contraseña usa `scrypt` con sal aleatoria, formato versionado y comparación segura.
+- `npm run auth:hash` solicita la contraseña sin eco ni argumento de proceso.
+- La sesión se firma con HMAC-SHA256, vence en cuatro horas y se verifica en cada endpoint protegido.
+- La cookie usa `HttpOnly`, `SameSite=Lax`, expiración, ruta raíz y `Secure` bajo HTTPS.
+- Login/logout validan `Origin`; `/api/auth/me` permite consultar el estado.
+- `requireAdministrator()` centraliza 401, 403 y autorización administrativa.
+- No existe ruta productiva para emitir una sesión sin privilegios.
+- Se retiraron clientes, proxy, variables, scripts, fixtures, suites y directorio activo de Supabase; la evidencia B/C1 continúa en Git.
 
-## Dependencias temporales
+## Verificación final
 
-Supabase sigue siendo necesario únicamente para autenticación administrativa durante C1:
+- `npm ci`: exitoso; instaló 377 paquetes desde el lockfile final.
+- `npm ls @supabase/ssr @supabase/supabase-js supabase --all`: árbol vacío.
+- `npm run test:unit`: 4 archivos y 14 pruebas aprobadas; incluye las 8 reglas previas y 6 casos de autenticación.
+- `npm run test:csv`: 3 archivos y 25 pruebas aprobadas.
+- `npm run test:http`: 1 archivo y 12 pruebas reales aprobadas contra Next.js y copias CSV temporales.
+- HTTP demostró login, cookie, logout, `Origin`, 401, 403 y 200.
+- La consulta administrativa devolvió dos snapshots y seis centros.
+- El dashboard confirmó 12.000 ml de inventario, 20.000 ml de objetivo, 8.000 ml de déficit y 6.000 ml anunciados.
+- El aislamiento devolvió 12.000 ml para el snapshot A y 2.700 ml para el B.
+- `npm run lint`, `npm run typecheck`, `npm run build` y `git diff --check`: aprobados.
+- El build generó correctamente 13 páginas/rutas. La primera ejecución dentro del sandbox de herramientas recibió EPERM al escribir `.next`; fuera de ese aislamiento compiló, por lo que no representa una dependencia ni un fallo del proyecto.
 
-- login y sesión;
-- proxy y renovación de cookies;
-- tabla `administradores` y sus políticas RLS.
-
-Los endpoints protegidos continúan exigiendo una sesión Supabase válida. La sustitución de este mecanismo pertenece a C2 y no está implementada. Por ello tampoco se declara una lectura HTTP administrativa autenticada con 200 como verificada en C1.
+La evidencia detallada T01–T14 se encuentra en `docs/PRUEBAS_C2.md`.
 
 ## Limitaciones conocidas
 
-- La persistencia de eventos de simulación no forma parte de C1; la simulación continúa como cálculo puro.
-- `data/runtime/` es almacenamiento local pensado para una sola instancia del proceso, no para concurrencia distribuida.
+- Las sesiones firmadas no tienen revocación individual inmediata; logout elimina la cookie del cliente y la rotación de `SESSION_SECRET` invalida todas.
+- `data/runtime/` está pensado para una sola instancia del proceso, no para concurrencia distribuida.
+- La persistencia de eventos de simulación no forma parte de C2; la simulación continúa como cálculo puro.
 - No se han iniciado importación Excel, interfaz visual ni dashboard interactivo.
 
-## Siguiente microbloque
+## Siguiente acción
 
-Completar la verificación HTTP administrativa pendiente cuando exista una sesión Supabase real. No iniciar C2 ni retirar los componentes temporales de Supabase sin aprobación explícita.
+Solicitar revisión del Bloque C2. No iniciar módulos posteriores sin aprobación.

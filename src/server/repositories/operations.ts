@@ -4,7 +4,10 @@ import type { OperationsRepository } from "./types";
 let defaultRepository: OperationsRepository | undefined;
 
 export function getOperationsRepository(): OperationsRepository {
-  defaultRepository ??= new CsvOperationsRepository();
+  defaultRepository ??= new CsvOperationsRepository({
+    demoRoot: process.env.OPERATIONS_DEMO_ROOT,
+    runtimeRoot: process.env.OPERATIONS_RUNTIME_ROOT,
+  });
   return defaultRepository;
 }
 

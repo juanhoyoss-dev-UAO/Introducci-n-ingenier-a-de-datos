@@ -1,55 +1,35 @@
-import {
-  isAuthSessionMissingError,
-  type SupabaseClient,
-  type User,
-} from "@supabase/supabase-js";
+import { cookies } from "next/headers";
 
 import { ApiError } from "@/server/services/errors";
-import { createServerSupabaseClient } from "@/server/db/supabase-server";
+import { getAuthConfiguration } from "./config";
+import {
+  SESSION_COOKIE_NAME,
+  type SessionClaims,
+  verifySessionToken,
+} from "./session";
 
 export interface AdministratorContext {
-  supabase: SupabaseClient;
-  user: User;
+  username: string;
+  role: "admin";
+  session: SessionClaims;
 }
 
 export async function requireAdministrator(): Promise<AdministratorContext> {
-  const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
+  const configuration = getAuthConfiguration();
+  const cookieStore = await cookies();
+  const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
+  const session = token
+    ? verifySessionToken(token, configuration.sessionSecret)
+    : null;
 
-  if (!user) {
-    if (
-      !userError ||
-      isAuthSessionMissingError(userError) ||
-      userError.status === 401
-    ) {
-      throw new ApiError(401, "UNAUTHENTICATED", "Se requiere iniciar sesión.");
-    }
-
-    throw new ApiError(
-      500,
-      "AUTH_SERVICE_ERROR",
-      "No fue posible verificar la sesión.",
-    );
+  if (!session) {
+    throw new ApiError(401, "UNAUTHENTICATED", "Se requiere iniciar sesión.");
   }
 
-  const { data: administrator, error: administratorError } = await supabase
-    .from("administradores")
-    .select("user_id")
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  if (administratorError) {
-    throw new ApiError(
-      500,
-      "DATABASE_ERROR",
-      "No fue posible verificar la autorización.",
-    );
-  }
-
-  if (!administrator) {
+  if (
+    session.role !== "admin" ||
+    session.sub !== configuration.administratorUsername
+  ) {
     throw new ApiError(
       403,
       "FORBIDDEN",
@@ -57,6 +37,10 @@ export async function requireAdministrator(): Promise<AdministratorContext> {
     );
   }
 
-  return { supabase, user };
+  return {
+    username: session.sub,
+    role: "admin",
+    session,
+  };
 }
 

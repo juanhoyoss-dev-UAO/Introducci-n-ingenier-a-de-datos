@@ -43,10 +43,23 @@
 
 El contrato preliminar se amplió con snapshots, reserva, simulaciones y eventos. `coordinadores` dejó de ser entidad separada, `inventario` pasó a `inventario_inicial` e `intenciones` a `donaciones_esperadas`. Estos cambios proceden del prompt aprobado del Bloque B y no borran el historial previo de Git.
 
+## Bloque C2
+
+| Fecha | Decisión | Motivo |
+| --- | --- | --- |
+| 2026-10-23 | Usar un único administrador configurado por entorno, sin valores predeterminados. | Cubre el prototipo sin autorregistro, proveedor externo ni almacén de usuarios. |
+| 2026-10-23 | Derivar contraseñas con `scrypt`, sal aleatoria y formato versionado. | Evita texto plano y permite verificación segura con primitivas mantenidas por Node.js. |
+| 2026-10-23 | Firmar sesiones stateless con HMAC-SHA256 y una vigencia máxima de cuatro horas. | Mantiene el despliegue local simple, sin base de sesiones, y limita la ventana de exposición. |
+| 2026-10-23 | Usar cookie `HttpOnly`, `SameSite=Lax`, expirable y `Secure` bajo HTTPS. | El secreto no queda accesible a JavaScript y se reducen riesgos de robo/CSRF. |
+| 2026-10-23 | Exigir `Origin` local exacto en login y logout. | Protege las operaciones que crean o eliminan la cookie. |
+| 2026-10-23 | Mantener `requireAdministrator()` como control autoritativo dentro de cada Route Handler. | Evita depender de un proxy optimista y conserva la centralización 401/403/200. |
+| 2026-10-23 | No añadir una dependencia de autenticación. | `node:crypto` cubre scrypt, HMAC y comparaciones seguras con menor superficie. |
+| 2026-10-23 | Ejecutar HTTP contra copias CSV temporales mediante raíces configurables del proceso hijo. | Prueba el recorrido real y el error de lectura sin modificar demo ni runtime personal. |
+| 2026-10-23 | Retirar Supabase sólo después de aprobar la autenticación y los endpoints locales. | Respeta una migración reversible; los checkpoints Git conservan la evidencia histórica. |
+
 ## Pendientes reales
 
-- Ejecutar C2 únicamente con aprobación: sustituir Supabase Auth y retirar sus clientes, variables, scripts y RLS.
-- Rehacer las pruebas HTTP 401/403/200 con la autenticación de C2.
-- Retirar la migración y el seed SQL sólo después de verificar que no se pierde evidencia o datos necesarios.
 - Definir persistencia de eventos únicamente cuando se autorice la fase correspondiente; C1 no la declara implementada.
+- No iniciar importador, interfaz ni otros módulos hasta recibir aprobación.
+- Revisar el Bloque C2 completo antes de continuar con otra fase.
 

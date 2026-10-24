@@ -54,10 +54,10 @@ Los snapshots son inmutables: una escritura con UUID existente falla. Las simula
 
 ## Datos demostrativos
 
-Los dos snapshots de `data/demo/snapshots` se derivan literalmente de `supabase/seed.sql`. El snapshot A contiene seis centros, cinco productos, siete presentaciones, inventario, necesidades, voluntarios, tiempos e intenciones. El snapshot B reutiliza `C01` con datos distintos e incluye `AGUA-330` para validar aislamiento.
+Los dos snapshots de `data/demo/snapshots` se derivan literalmente del seed SQL histórico del Bloque B, recuperable desde el checkpoint Git. Ese directorio SQL ya no forma parte de la aplicación activa. El snapshot A contiene seis centros, cinco productos, siete presentaciones, inventario, necesidades, voluntarios, tiempos e intenciones. El snapshot B reutiliza `C01` con datos distintos e incluye `AGUA-330` para validar aislamiento.
 
 - Snapshot A, C01, agua confirmada: 12.000 ml.
 - Snapshot B, C01, agua confirmada: 2.700 ml.
 - Snapshot A, C01, intención de agua: 6.000 ml anunciados.
 
-El SQL queda como legado y fuente histórica; la API operativa lee CSV. Los usuarios administradores no se guardan en estos archivos: permanecen temporalmente en Supabase Auth hasta C2.
+El SQL queda como legado recuperable y fuente histórica; la API operativa lee CSV. Las credenciales administrativas tampoco se guardan en estos archivos: se configuran localmente mediante variables de entorno y un hash `scrypt`.

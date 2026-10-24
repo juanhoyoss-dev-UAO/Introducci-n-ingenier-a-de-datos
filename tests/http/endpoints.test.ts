@@ -1,16 +1,22 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { type ChildProcess, spawn } from "node:child_process";
+import { randomBytes } from "node:crypto";
+import { cp, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { createServer } from "node:net";
+import path from "node:path";
 
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
+import { createPasswordHash } from "@/server/auth/password";
 import {
-  ADMIN_EMAIL,
-  createSessionCookieHeader,
-  integrationIsEnabled,
-  recreateAuthorizationFixtures,
-  TEST_PASSWORD,
-  USER_EMAIL,
-} from "../helpers/supabase";
+  SESSION_COOKIE_NAME,
+  signSessionToken,
+} from "@/server/auth/session";
 
 const SNAPSHOT_A = "10000000-0000-4000-8000-000000000001";
+const SNAPSHOT_B = "10000000-0000-4000-8000-000000000002";
 const UNKNOWN_SNAPSHOT = "10000000-0000-4000-8000-000000000099";
+const ADMIN_USERNAME = "administrador-pruebas";
+const ADMIN_PASSWORD = "Prueba-C2-local!2026";
 
 interface ApiSuccess<T> {
   data: T;
@@ -19,6 +25,10 @@ interface ApiSuccess<T> {
 
 interface ApiFailure {
   error: { code: string; message: string; details?: unknown };
+}
+
+interface SnapshotResponse {
+  id: string;
 }
 
 interface ProductResponse {
@@ -32,143 +42,443 @@ interface DashboardResponse {
     productos: Array<{
       producto_id: string;
       inventario_confirmado_unidad_base: number;
-      donaciones_esperadas_unidad_base: number;
+      objetivo_unidad_base: number;
       deficit_confirmado_unidad_base: number;
+      donaciones_esperadas_unidad_base: number;
     }>;
-  }>;
-  candidatos_traslado: Array<{
-    origen_id: string;
-    destino_id: string;
-    minutos: number;
-    total_unidad_base: number;
   }>;
 }
 
-describe.runIf(integrationIsEnabled())("HTTP real", () => {
-  let baseUrl: string;
-  let administratorCookie: string;
-  let regularUserCookie: string;
+interface RequestOptions {
+  cookie?: string;
+  method?: "GET" | "POST";
+  body?: unknown;
+  origin?: string;
+}
 
-  beforeAll(async () => {
-    baseUrl = process.env.TEST_BASE_URL ?? "http://127.0.0.1:3000";
-    const hostname = new URL(baseUrl).hostname;
-    if (hostname !== "127.0.0.1" && hostname !== "localhost") {
-      throw new Error("Las pruebas HTTP solo se permiten contra la aplicación local.");
+async function reserveLocalPort() {
+  const server = createServer();
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", resolve);
+  });
+  const address = server.address();
+  if (!address || typeof address === "string") {
+    server.close();
+    throw new Error("No fue posible reservar un puerto local para las pruebas.");
+  }
+  const port = address.port;
+  await new Promise<void>((resolve, reject) => {
+    server.close((error) => (error ? reject(error) : resolve()));
+  });
+  return port;
+}
+
+function waitForExit(child: ChildProcess, timeoutMs: number) {
+  if (child.exitCode !== null || child.signalCode !== null) {
+    return Promise.resolve(true);
+  }
+  return new Promise<boolean>((resolve) => {
+    const timeout = setTimeout(() => {
+      child.removeListener("exit", onExit);
+      resolve(false);
+    }, timeoutMs);
+    function onExit() {
+      clearTimeout(timeout);
+      resolve(true);
+    }
+    child.once("exit", onExit);
+  });
+}
+
+describe("HTTP real C2", () => {
+  let baseUrl = "";
+  let temporaryRoot = "";
+  let demoRoot = "";
+  let serverProcess: ChildProcess | undefined;
+  let serverOutput = "";
+  let administratorCookie = "";
+  let sessionSecret = "";
+
+  async function api<T>(requestPath: string, options: RequestOptions = {}) {
+    const headers: Record<string, string> = {};
+    if (options.cookie) {
+      headers.Cookie = options.cookie;
+    }
+    if (options.origin) {
+      headers.Origin = options.origin;
+    }
+    if (options.body !== undefined) {
+      headers["Content-Type"] = "application/json";
     }
 
-    await recreateAuthorizationFixtures();
-    administratorCookie = await createSessionCookieHeader(
-      ADMIN_EMAIL,
-      TEST_PASSWORD,
-    );
-    regularUserCookie = await createSessionCookieHeader(
-      USER_EMAIL,
-      TEST_PASSWORD,
-    );
-  });
-
-  async function request<T>(path: string, cookie?: string) {
-    const response = await fetch(`${baseUrl}${path}`, {
-      headers: cookie ? { cookie } : undefined,
+    const response = await fetch(`${baseUrl}${requestPath}`, {
+      method: options.method ?? "GET",
+      headers,
+      body:
+        options.body === undefined ? undefined : JSON.stringify(options.body),
     });
     return { response, body: (await response.json()) as T };
   }
 
-  it("expone health sin información sensible", async () => {
-    const { response, body } = await request<
-      ApiSuccess<{ status: string }>
-    >("/api/health");
-    expect(response.status).toBe(200);
+  async function waitForServer() {
+    const deadline = Date.now() + 60_000;
+    while (Date.now() < deadline) {
+      if (
+        serverProcess?.exitCode !== null ||
+        serverProcess?.signalCode !== null
+      ) {
+        throw new Error(`Next.js terminó antes de iniciar.\n${serverOutput}`);
+      }
+      try {
+        const response = await fetch(`${baseUrl}/api/health`);
+        if (response.ok) {
+          return;
+        }
+      } catch {
+        // El puerto todavía no está listo.
+      }
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+    throw new Error(`Next.js no inició dentro del plazo.\n${serverOutput}`);
+  }
+
+  beforeAll(async () => {
+    const runtimeTestsRoot = path.join(
+      process.cwd(),
+      "data",
+      "runtime",
+      ".http-tests",
+    );
+    await mkdir(runtimeTestsRoot, { recursive: true });
+    temporaryRoot = await mkdtemp(path.join(runtimeTestsRoot, "c2-"));
+    demoRoot = path.join(temporaryRoot, "demo", "snapshots");
+    const isolatedRuntimeRoot = path.join(temporaryRoot, "runtime");
+    await mkdir(path.dirname(demoRoot), { recursive: true });
+    await cp(path.join(process.cwd(), "data", "demo", "snapshots"), demoRoot, {
+      recursive: true,
+    });
+
+    sessionSecret = randomBytes(48).toString("base64url");
+    const administratorPasswordHash = await createPasswordHash(ADMIN_PASSWORD);
+    const port = await reserveLocalPort();
+    baseUrl = `http://127.0.0.1:${port}`;
+
+    const nextBinary = path.join(
+      process.cwd(),
+      "node_modules",
+      "next",
+      "dist",
+      "bin",
+      "next",
+    );
+    const childEnvironment = { ...process.env };
+    for (const name of Object.keys(childEnvironment)) {
+      if (name.includes("SUPABASE")) {
+        delete childEnvironment[name];
+      }
+    }
+    Object.assign(childEnvironment, {
+      NODE_ENV: "development",
+      NEXT_TELEMETRY_DISABLED: "1",
+      ADMIN_USERNAME,
+      ADMIN_PASSWORD_HASH: administratorPasswordHash,
+      SESSION_SECRET: sessionSecret,
+      OPERATIONS_DEMO_ROOT: demoRoot,
+      OPERATIONS_RUNTIME_ROOT: isolatedRuntimeRoot,
+    });
+
+    const child = spawn(
+      process.execPath,
+      [nextBinary, "dev", "--webpack", "-H", "127.0.0.1", "-p", String(port)],
+      {
+        cwd: process.cwd(),
+        env: childEnvironment,
+        stdio: ["ignore", "pipe", "pipe"],
+      },
+    );
+    serverProcess = child;
+    const captureOutput = (chunk: Buffer) => {
+      serverOutput = `${serverOutput}${chunk.toString("utf8")}`.slice(-20_000);
+    };
+    child.stdout?.on("data", captureOutput);
+    child.stderr?.on("data", captureOutput);
+
+    try {
+      await waitForServer();
+    } catch (error) {
+      child.kill();
+      throw error;
+    }
+  }, 120_000);
+
+  afterAll(async () => {
+    if (serverProcess && serverProcess.exitCode === null) {
+      serverProcess.kill();
+      await waitForExit(serverProcess, 10_000);
+    }
+    if (temporaryRoot) {
+      await rm(temporaryRoot, { recursive: true, force: true });
+    }
+  }, 20_000);
+
+  it("mantiene health público y sin información sensible", async () => {
+    const { response, body } = await api<ApiSuccess<{ status: string }>>(
+      "/api/health",
+    );
+    expect(response.status, JSON.stringify(body)).toBe(200);
     expect(body).toEqual({ data: { status: "ok" }, meta: {} });
   });
 
-  it("T09 diferencia anónimo, usuario no autorizado y administrador", async () => {
-    const anonymous = await request<ApiFailure>("/api/snapshots");
-    const regular = await request<ApiFailure>(
-      "/api/snapshots",
-      regularUserCookie,
-    );
-    const administrator = await request<ApiSuccess<Array<{ id: string }>>>(
-      "/api/snapshots",
-      administratorCookie,
-    );
+  it("T01 inicia sesión y entrega una cookie con atributos seguros", async () => {
+    const { response, body } = await api<
+      ApiSuccess<{
+        authenticated: boolean;
+        user: { username: string; role: string };
+      }>
+    >("/api/auth/login", {
+      method: "POST",
+      origin: baseUrl,
+      body: { username: ADMIN_USERNAME, password: ADMIN_PASSWORD },
+    });
 
-    expect(anonymous.response.status).toBe(401);
-    expect(anonymous.body.error.code).toBe("UNAUTHENTICATED");
-    expect(regular.response.status).toBe(403);
-    expect(regular.body.error.code).toBe("FORBIDDEN");
-    expect(administrator.response.status).toBe(200);
-    expect(administrator.body.data).toHaveLength(2);
+    expect(response.status, JSON.stringify(body)).toBe(200);
+    expect(body.data).toMatchObject({
+      authenticated: true,
+      user: { username: ADMIN_USERNAME, role: "admin" },
+    });
+    const setCookie = response.headers.get("set-cookie");
+    expect(setCookie).toBeTruthy();
+    expect(setCookie).toContain(`${SESSION_COOKIE_NAME}=`);
+    expect(setCookie).toMatch(/;\s*HttpOnly/i);
+    expect(setCookie).toMatch(/;\s*SameSite=Lax/i);
+    expect(setCookie).toMatch(/;\s*Path=\//i);
+    expect(setCookie).toMatch(/;\s*Expires=/i);
+    expect(setCookie).toMatch(/;\s*Max-Age=\d+/i);
+    expect(setCookie).not.toMatch(/;\s*Secure/i);
+    administratorCookie = setCookie?.split(";", 1)[0] ?? "";
+
+    const me = await api<
+      ApiSuccess<{
+        authenticated: boolean;
+        user: { username: string; role: string };
+      }>
+    >("/api/auth/me", { cookie: administratorCookie });
+    expect(me.response.status).toBe(200);
+    expect(me.body.data).toMatchObject({
+      authenticated: true,
+      user: { username: ADMIN_USERNAME, role: "admin" },
+    });
   });
 
-  it("consulta snapshots, seis centros, productos y tiempos desde CSV", async () => {
-    const snapshots = await request<ApiSuccess<Array<{ id: string }>>>(
-      "/api/snapshots",
-      administratorCookie,
-    );
-    const centers = await request<
-      ApiSuccess<Array<{ centro_id: string }>>
-    >(`/api/centers?snapshotId=${SNAPSHOT_A}`, administratorCookie);
-    const products = await request<ApiSuccess<ProductResponse[]>>(
-      `/api/products?snapshotId=${SNAPSHOT_A}`,
-      administratorCookie,
-    );
-    const times = await request<
-      ApiSuccess<Array<{ origen_id: string; destino_id: string }>>
-    >(`/api/travel-times?snapshotId=${SNAPSHOT_A}`, administratorCookie);
+  it("T02 rechaza credenciales incorrectas sin revelar el campo fallido", async () => {
+    const { response, body } = await api<ApiFailure>("/api/auth/login", {
+      method: "POST",
+      origin: baseUrl,
+      body: { username: ADMIN_USERNAME, password: "incorrecta" },
+    });
+    expect(response.status, JSON.stringify(body)).toBe(401);
+    expect(body.error).toEqual({
+      code: "INVALID_CREDENTIALS",
+      message: "El usuario o la contraseña no son válidos.",
+    });
+    expect(response.headers.get("set-cookie")).toBeNull();
+  });
 
+  it("rechaza mutaciones de sesión sin un Origin local exacto", async () => {
+    const missingOrigin = await api<ApiFailure>("/api/auth/login", {
+      method: "POST",
+      body: { username: ADMIN_USERNAME, password: ADMIN_PASSWORD },
+    });
+    const foreignOrigin = await api<ApiFailure>("/api/auth/logout", {
+      method: "POST",
+      origin: "https://example.invalid",
+      cookie: administratorCookie,
+    });
+    expect(missingOrigin.response.status).toBe(403);
+    expect(missingOrigin.body.error.code).toBe("INVALID_ORIGIN");
+    expect(foreignOrigin.response.status).toBe(403);
+    expect(foreignOrigin.body.error.code).toBe("INVALID_ORIGIN");
+  });
+
+  it("T03 rechaza una sesión anónima", async () => {
+    const { response, body } = await api<ApiFailure>("/api/snapshots");
+    expect(response.status).toBe(401);
+    expect(body.error.code).toBe("UNAUTHENTICATED");
+  });
+
+  it("T04 devuelve 403 para una sesión firmada sin rol administrador", async () => {
+    const { token } = signSessionToken(
+      { username: "fixture-sin-privilegios", role: "viewer" },
+      sessionSecret,
+    );
+    const { response, body } = await api<ApiFailure>("/api/snapshots", {
+      cookie: `${SESSION_COOKIE_NAME}=${token}`,
+    });
+    expect(response.status).toBe(403);
+    expect(body.error.code).toBe("FORBIDDEN");
+  });
+
+  it("T05 permite al administrador consultar dos snapshots CSV", async () => {
+    const [snapshots, detail] = await Promise.all([
+      api<ApiSuccess<SnapshotResponse[]>>("/api/snapshots", {
+        cookie: administratorCookie,
+      }),
+      api<ApiSuccess<SnapshotResponse>>(`/api/snapshots/${SNAPSHOT_A}`, {
+        cookie: administratorCookie,
+      }),
+    ]);
     expect(snapshots.response.status).toBe(200);
     expect(snapshots.body.data).toHaveLength(2);
+    expect(snapshots.body.data.map((snapshot) => snapshot.id).sort()).toEqual([
+      SNAPSHOT_A,
+      SNAPSHOT_B,
+    ]);
+    expect(detail.response.status).toBe(200);
+    expect(detail.body.data.id).toBe(SNAPSHOT_A);
+  });
+
+  it("T06 recupera centros, productos y tiempos desde CSV reales", async () => {
+    const [centers, products, travelTimes] = await Promise.all([
+      api<ApiSuccess<Array<{ centro_id: string }>>>(
+        `/api/centers?snapshotId=${SNAPSHOT_A}`,
+        { cookie: administratorCookie },
+      ),
+      api<ApiSuccess<ProductResponse[]>>(
+        `/api/products?snapshotId=${SNAPSHOT_A}`,
+        { cookie: administratorCookie },
+      ),
+      api<ApiSuccess<Array<{ origen_id: string; destino_id: string }>>>(
+        `/api/travel-times?snapshotId=${SNAPSHOT_A}`,
+        { cookie: administratorCookie },
+      ),
+    ]);
     expect(centers.response.status).toBe(200);
     expect(centers.body.data).toHaveLength(6);
+    expect(centers.body.meta).toMatchObject({
+      snapshot_id: SNAPSHOT_A,
+      total: 6,
+    });
     expect(products.response.status).toBe(200);
     expect(products.body.data).toHaveLength(5);
     expect(
       products.body.data.flatMap((product) => product.presentaciones),
     ).toHaveLength(7);
-    expect(times.response.status).toBe(200);
-    expect(times.body.data).toContainEqual(
+    expect(travelTimes.response.status).toBe(200);
+    expect(travelTimes.body.data).toContainEqual(
       expect.objectContaining({ origen_id: "C02", destino_id: "C01" }),
     );
   });
 
-  it("T08 entrega los cálculos obligatorios desde el dashboard backend", async () => {
-    const { response, body } = await request<ApiSuccess<DashboardResponse>>(
+  it("T07 conserva inventario, objetivo, déficit y donación separados", async () => {
+    const { response, body } = await api<ApiSuccess<DashboardResponse>>(
       `/api/dashboard?snapshotId=${SNAPSHOT_A}`,
-      administratorCookie,
+      { cookie: administratorCookie },
     );
     expect(response.status).toBe(200);
-
-    const center = body.data.centros.find((item) => item.centro_id === "C01");
-    const water = center?.productos.find(
-      (product) => product.producto_id === "P01",
-    );
+    const water = body.data.centros
+      .find((center) => center.centro_id === "C01")
+      ?.productos.find((product) => product.producto_id === "P01");
     expect(water).toMatchObject({
-      inventario_confirmado_unidad_base: 12000,
-      donaciones_esperadas_unidad_base: 6000,
-      deficit_confirmado_unidad_base: 8000,
+      inventario_confirmado_unidad_base: 12_000,
+      objetivo_unidad_base: 20_000,
+      deficit_confirmado_unidad_base: 8_000,
+      donaciones_esperadas_unidad_base: 6_000,
     });
-    expect(body.data.candidatos_traslado).toContainEqual(
-      expect.objectContaining({
-        origen_id: "C02",
-        destino_id: "C01",
-        minutos: 15,
-      }),
-    );
   });
 
-  it("T10 diferencia parámetros ausentes, inválidos e inexistentes", async () => {
-    const missing = await request<ApiFailure>(
-      "/api/centers",
-      administratorCookie,
+  it("T08 mantiene aislados los datos de ambos snapshots", async () => {
+    const [snapshotA, snapshotB] = await Promise.all([
+      api<ApiSuccess<DashboardResponse>>(
+        `/api/dashboard?snapshotId=${SNAPSHOT_A}`,
+        { cookie: administratorCookie },
+      ),
+      api<ApiSuccess<DashboardResponse>>(
+        `/api/dashboard?snapshotId=${SNAPSHOT_B}`,
+        { cookie: administratorCookie },
+      ),
+    ]);
+    function waterInventory(body: ApiSuccess<DashboardResponse>) {
+      return body.data.centros
+        .find((center) => center.centro_id === "C01")
+        ?.productos.find((product) => product.producto_id === "P01")
+        ?.inventario_confirmado_unidad_base;
+    }
+    expect(snapshotA.response.status).toBe(200);
+    expect(snapshotB.response.status).toBe(200);
+    expect(waterInventory(snapshotA.body)).toBe(12_000);
+    expect(waterInventory(snapshotB.body)).toBe(2_700);
+  });
+
+  it("T09 rechaza alteración, firma o secreto incorrectos y expiración", async () => {
+    const token = administratorCookie.slice(
+      `${SESSION_COOKIE_NAME}=`.length,
     );
-    const malformed = await request<ApiFailure>(
+    const [payload, signature] = token.split(".");
+    const changedPayload = `${payload[0] === "A" ? "B" : "A"}${payload.slice(1)}`;
+    const changedSignature = `${signature[0] === "A" ? "B" : "A"}${signature.slice(1)}`;
+    const now = Math.floor(Date.now() / 1000);
+    const expired = signSessionToken(
+      {
+        username: ADMIN_USERNAME,
+        role: "admin",
+        issuedAt: now - 120,
+        expiresAt: now - 60,
+      },
+      sessionSecret,
+    ).token;
+    const wrongSecret = signSessionToken(
+      { username: ADMIN_USERNAME, role: "admin" },
+      randomBytes(48).toString("base64url"),
+    ).token;
+    const alphabet =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+    const finalSignatureIndex = alphabet.indexOf(signature.at(-1) ?? "");
+    const nonCanonicalSignature = `${signature.slice(0, -1)}${alphabet[finalSignatureIndex + 1]}`;
+    const cookies = [
+      `${SESSION_COOKIE_NAME}=${changedPayload}.${signature}`,
+      `${SESSION_COOKIE_NAME}=${payload}.${changedSignature}`,
+      `${SESSION_COOKIE_NAME}=${expired}`,
+      `${SESSION_COOKIE_NAME}=${wrongSecret}`,
+      `${SESSION_COOKIE_NAME}=${payload}.${nonCanonicalSignature}`,
+      undefined,
+    ];
+
+    for (const cookie of cookies) {
+      const result = await api<ApiFailure>("/api/snapshots", { cookie });
+      expect(result.response.status).toBe(401);
+      expect(result.body.error.code).toBe("UNAUTHENTICATED");
+    }
+
+    const logout = await api<ApiSuccess<{ authenticated: boolean }>>(
+      "/api/auth/logout",
+      {
+        method: "POST",
+        origin: baseUrl,
+        cookie: administratorCookie,
+      },
+    );
+    expect(logout.response.status).toBe(200);
+    expect(logout.response.headers.get("set-cookie")).toMatch(
+      new RegExp(`${SESSION_COOKIE_NAME}=;.*Max-Age=0`, "i"),
+    );
+
+    const afterLogout = await api<ApiFailure>("/api/snapshots");
+    expect(afterLogout.response.status).toBe(401);
+    expect(afterLogout.body.error.code).toBe("UNAUTHENTICATED");
+  });
+
+  it("T10 normaliza errores 400, 404 y 500 sin filtrar internals", async () => {
+    const missing = await api<ApiFailure>("/api/centers", {
+      cookie: administratorCookie,
+    });
+    const malformed = await api<ApiFailure>(
       "/api/centers?snapshotId=no-es-uuid",
-      administratorCookie,
+      { cookie: administratorCookie },
     );
-    const notFound = await request<ApiFailure>(
+    const notFound = await api<ApiFailure>(
       `/api/centers?snapshotId=${UNKNOWN_SNAPSHOT}`,
-      administratorCookie,
+      { cookie: administratorCookie },
     );
 
     expect(missing.response.status).toBe(400);
@@ -177,7 +487,21 @@ describe.runIf(integrationIsEnabled())("HTTP real", () => {
     expect(malformed.body.error.code).toBe("INVALID_SNAPSHOT_ID");
     expect(notFound.response.status).toBe(404);
     expect(notFound.body.error.code).toBe("SNAPSHOT_NOT_FOUND");
-    expect(JSON.stringify(notFound.body)).not.toMatch(/stack|postgres|supabase/i);
+
+    const corruptedCsv = path.join(demoRoot, SNAPSHOT_A, "productos.csv");
+    await writeFile(corruptedCsv, "contenido,invalido\n", "utf8");
+    const readError = await api<ApiFailure>(
+      `/api/products?snapshotId=${SNAPSHOT_A}`,
+      { cookie: administratorCookie },
+    );
+    expect(readError.response.status).toBe(500);
+    expect(readError.body.error).toEqual({
+      code: "DATABASE_ERROR",
+      message: "No fue posible consultar la base de datos.",
+    });
+    const serializedError = JSON.stringify(readError.body);
+    expect(serializedError).not.toContain(temporaryRoot);
+    expect(serializedError).not.toContain(sessionSecret);
+    expect(serializedError).not.toMatch(/stack|scrypt|supabase|\\src\\|\/src\//i);
   });
 });
-

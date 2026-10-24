@@ -2,9 +2,32 @@
 
 ## Convenciones
 
-Las respuestas exitosas usan `{ "data": ..., "meta": ... }`. Los errores usan `{ "error": { "code": "...", "message": "...", "details": ... } }` y no exponen rutas internas, contenido de archivos, trazas ni credenciales.
+Las respuestas exitosas usan `{ "data": ..., "meta": ... }`. Los errores usan `{ "error": { "code": "...", "message": "...", "details": ... } }` y no exponen rutas internas, contenido de archivos, trazas, hashes ni secretos.
 
-`/api/health` es público. Los demás endpoints mantienen la sesión Supabase y la autorización mediante `administradores`: anónimo recibe 401 y un autenticado no autorizado 403. La autenticación se reemplazará en C2.
+`/api/health` es público. Las rutas operativas verifican en cada petición una cookie local firmada y el rol administrador: una sesión ausente o inválida recibe 401 y una sesión válida sin privilegios recibe 403.
+
+## Autenticación local
+
+| Método | Ruta | Autorización | Resultado |
+| --- | --- | --- | --- |
+| POST | `/api/auth/login` | Pública, `Origin` del mismo origen | Valida usuario/contraseña y crea cookie administrativa. |
+| POST | `/api/auth/logout` | `Origin` del mismo origen | Elimina la cookie del cliente de forma idempotente. |
+| GET | `/api/auth/me` | Pública | Devuelve estado de sesión; anónimo obtiene `authenticated: false`. |
+
+Login recibe JSON estricto:
+
+```json
+{
+  "username": "administrador-local",
+  "password": "contraseña-no-versionada"
+}
+```
+
+Un login correcto responde 200 y envía `redes_ayuda_session` con `HttpOnly`, `SameSite=Lax`, `Path=/`, `Expires`, `Max-Age` y `Secure` cuando se sirve por HTTPS. La contraseña, su hash y `SESSION_SECRET` nunca forman parte de la respuesta.
+
+Las credenciales incorrectas usan un único mensaje `INVALID_CREDENTIALS`; no distinguen si falló usuario o contraseña. Login y logout rechazan un `Origin` ausente o diferente con 403 `INVALID_ORIGIN`.
+
+## Endpoints operativos
 
 | Método | Ruta | Autorización | Fuente y resultado |
 | --- | --- | --- | --- |
@@ -16,7 +39,7 @@ Las respuestas exitosas usan `{ "data": ..., "meta": ... }`. Los errores usan `{
 | GET | `/api/travel-times?snapshotId=...` | Administrador | Tiempos dirigidos validados. |
 | GET | `/api/dashboard?snapshotId=...` | Administrador | Métricas calculadas desde los ocho CSV. |
 
-Las rutas y formas de respuesta no cambiaron en C1. No existen endpoints de escritura, importación, avance de simulación ni recepción de donaciones; la escritura de snapshots es una capacidad interna del repositorio.
+No existen endpoints de escritura, importación, avance de simulación ni recepción de donaciones; la escritura de snapshots es una capacidad interna del repositorio.
 
 ## Ejemplos
 
@@ -25,6 +48,15 @@ Health:
 ```json
 {
   "data": { "status": "ok" },
+  "meta": {}
+}
+```
+
+Estado anónimo:
+
+```json
+{
+  "data": { "authenticated": false, "user": null },
   "meta": {}
 }
 ```
@@ -59,12 +91,18 @@ El dashboard incluye `centros`, `donaciones_esperadas` y `candidatos_traslado`. 
 
 | HTTP | Código | Uso |
 | --- | --- | --- |
+| 400 | `INVALID_REQUEST` | JSON de login ausente, inválido o fuera de límites. |
 | 400 | `MISSING_SNAPSHOT_ID`, `INVALID_SNAPSHOT_ID` | Parámetro ausente o inválido. |
-| 401 | `UNAUTHENTICATED` | Sesión ausente o inválida. |
-| 403 | `FORBIDDEN` | Usuario autenticado sin autorización. |
+| 401 | `INVALID_CREDENTIALS` | Login rechazado sin revelar el campo fallido. |
+| 401 | `UNAUTHENTICATED` | Sesión ausente, alterada, vencida o firmada con otra clave. |
+| 403 | `INVALID_ORIGIN` | Mutación de sesión sin origen local exacto. |
+| 403 | `FORBIDDEN` | Sesión válida sin rol administrador o con otro sujeto. |
 | 404 | `SNAPSHOT_NOT_FOUND` | UUID válido no encontrado. |
-| 500 | `AUTH_SERVICE_ERROR`, `DATABASE_ERROR`, `INTERNAL_ERROR` | Fallo controlado sin información interna. |
+| 500 | `AUTH_CONFIGURATION_ERROR` | Configuración local ausente o inválida, sin detalles sensibles. |
+| 500 | `DATABASE_ERROR`, `INTERNAL_ERROR` | Fallo controlado sin información interna. |
 
-`DATABASE_ERROR` se conserva temporalmente por compatibilidad del contrato; en C1 también representa fallos del repositorio o archivos CSV.
+`DATABASE_ERROR` se conserva por compatibilidad del contrato y representa fallos del repositorio o archivos CSV; no implica una base de datos activa.
 
-Las respuestas administrativas 200 todavía dependen de disponer de Supabase Auth. Las pruebas de servicio/repositorio demuestran los cálculos CSV, pero no se presentan como pruebas HTTP autenticadas.
+## Límite de revocación
+
+La sesión es stateless y tiene una vida máxima de cuatro horas. Logout borra la cookie del cliente, pero no existe revocación individual inmediata de un token copiado antes del cierre. Rotar `SESSION_SECRET` invalida todas las sesiones vigentes.

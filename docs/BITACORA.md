@@ -79,3 +79,38 @@
 - `GET /api/snapshots` sin sesión respondió HTTP 401 con código `UNAUTHENTICATED`.
 - No se ejecutó un HTTP 200 administrativo autenticado porque requiere una sesión y cuenta Supabase reales.
 - Ninguna prueba omitida o no ejecutada se contó como aprobada.
+
+## 2026-10-23 — Bloque C2
+
+### C2.1 — Autenticación local
+
+- Se sustituyeron usuario externo, proxy y consulta de administradores por `ADMIN_USERNAME`, un hash `scrypt` versionado y `SESSION_SECRET`.
+- Se añadió generación interactiva de hash sin contraseña en argumentos ni eco.
+- Las sesiones usan payload mínimo firmado con HMAC-SHA256, cuatro horas de vigencia y cookie `HttpOnly`, `SameSite=Lax`, expirable y `Secure` bajo HTTPS.
+- `requireAdministrator()` comprueba firma, vencimiento, sujeto y rol en cada endpoint.
+
+### C2.2 — Login, logout y protección
+
+- Se añadieron `POST /api/auth/login`, `POST /api/auth/logout` y `GET /api/auth/me`.
+- Login y logout exigen `Origin` local exacto; las credenciales inválidas reciben un único mensaje genérico.
+- La página `/login` permite entrar, consultar la sesión activa y cerrar sesión sin `localStorage`.
+- No existe una ruta productiva para emitir roles no administrativos.
+
+### C2.3 — Retirada controlada
+
+- La autenticación y la lectura CSV se demostraron mediante HTTP real antes de retirar Supabase.
+- Se retiraron paquetes, scripts, clientes, proxy, variables, fixtures, suites condicionadas y el árbol activo `supabase/`.
+- La migración, seed y decisiones B/C1 continúan recuperables desde los checkpoints Git.
+- No se añadieron dependencias de autenticación ni se modificaron fórmulas o contratos operativos.
+
+### C2.4 — Verificación final
+
+- `npm run test:unit` aprobó 14 pruebas: las 8 previas y 6 de autenticación.
+- `npm run test:csv` conservó 25 pruebas aprobadas.
+- `npm run test:http` aprobó 12 pruebas reales sobre un servidor Next.js y copias CSV temporales.
+- Se verificaron 401, 403 y 200; dos snapshots; seis centros; métricas 12.000/20.000/8.000/6.000; aislamiento 12.000/2.700; logout y rechazo de tokens inválidos.
+- `npm ci` instaló 377 paquetes desde el lockfile final y `npm ls @supabase/ssr @supabase/supabase-js supabase --all` quedó vacío.
+- Después de la instalación limpia volvieron a aprobar unitarias, CSV, HTTP, lint y typecheck.
+- El build de Next.js aprobó con 13 páginas/rutas y `git diff --check` no detectó errores.
+- El sandbox de herramientas bloqueó inicialmente la escritura de `.next` con EPERM; el mismo build ejecutado fuera de ese aislamiento compiló correctamente. No es un requisito ni un fallo del proyecto.
+- Estado: C2 completo, pendiente únicamente de revisión humana y sin iniciar módulos posteriores.
