@@ -1,26 +1,99 @@
 # Redes de Ayuda
 
-Prototipo académico para coordinar centros de acopio en Cali. La persistencia operativa usa snapshots CSV/JSON locales, la autenticación administrativa es local y `/dashboard` ofrece una consola de inspección de sólo lectura. No requiere Supabase, PostgreSQL, Docker ni servicios externos.
+Aplicación académica local para consultar el estado de centros de acopio en Cali. Usa Next.js, React y TypeScript; almacena la información operativa en snapshots CSV/JSON y protege la consola con una cuenta administrativa local.
 
-No incluye importador Excel, dashboard definitivo con gráficos, endpoints de escritura ni motor interactivo de simulación.
+La versión actual permite iniciar sesión, escoger un snapshot, filtrar por centro y consultar centros, inventario físico, necesidades, voluntarios, donaciones esperadas y tiempos de traslado. No necesita Supabase, PostgreSQL, Docker ni una instalación global de Next.js.
 
-## Requisitos
+No están implementados todavía el importador CSV/Excel, la capacidad máxima en kilogramos, las recepciones confirmadas por hora, los gráficos de evolución, endpoints de escritura ni una simulación interactiva.
 
-- Node.js 24 recomendado; Next.js requiere 20.9 o superior.
-- npm.
-- Git.
+## 1. Aviso de seguridad antes de compartir el repositorio
 
-## Instalación
+La auditoría E0 encontró que, en el commit `e662241`, `.env.local` está versionado y contiene valores no vacíos para la cuenta administrativa, el hash y el secreto de sesión. Este README no reproduce esos valores.
 
-```bash
-git clone https://github.com/juanhoyoss-dev-UAO/Introducci-n-ingenier-a-de-datos.git
-cd Introducci-n-ingenier-a-de-datos
-npm ci
+**No se debe distribuir ese commit como base para los compañeros hasta retirar el archivo del seguimiento y rotar las credenciales.** El líder técnico debe:
+
+1. Generar una contraseña nueva y un `SESSION_SECRET` nuevo.
+2. Añadir `.env*` y la excepción `!.env.example` a `.gitignore`.
+3. Ejecutar `git rm --cached .env.local` para conservar el archivo local pero retirarlo del índice.
+4. Crear un commit normal con esa retirada. E0 no requiere reescribir el historial.
+5. Confirmar con `git ls-files --error-unmatch .env.local` que Git ya no lo sigue.
+6. Pedir a cada integrante que cree sus propias credenciales locales.
+
+La rotación de `SESSION_SECRET` invalida todas las sesiones firmadas con el secreto anterior. Si la contraseña asociada al hash versionado pudo ser conocida, también debe cambiarse.
+
+## 2. Requisitos previos en Windows
+
+Instala estas herramientas antes de clonar el proyecto:
+
+- **Git para Windows:** <https://git-scm.com/download/win>
+- **Node.js:** <https://nodejs.org/>. Next.js `16.4.3` exige Node.js `20.9.0` o posterior; se recomienda una versión LTS compatible. La auditoría utilizó Node.js `24.18.0`.
+- **npm:** se instala junto con Node.js. La auditoría utilizó npm `11.16.0`.
+- **Visual Studio Code**, recomendado: <https://code.visualstudio.com/>
+- Un navegador moderno, por ejemplo Edge, Chrome o Firefox.
+- Opcionalmente **GitHub Desktop:** <https://desktop.github.com/>
+
+Abre PowerShell y verifica las instalaciones:
+
+```powershell
+git --version
+node --version
+npm.cmd --version
 ```
 
-## Configuración local
+Si alguno de esos comandos no existe, cierra y vuelve a abrir la terminal después de instalar la herramienta. No instales Next.js globalmente: `npm.cmd ci` instalará la versión exacta del proyecto.
 
-Copiar `.env.example` como `.env.local`. No versionar `.env.local` ni credenciales reales.
+## 3. Descargar el repositorio
+
+### Opción A: GitHub Desktop
+
+1. Abre GitHub Desktop.
+2. Elige **File → Clone repository → URL**.
+3. Usa esta URL real:
+
+   `https://github.com/juanhoyoss-dev-UAO/Introducci-n-ingenier-a-de-datos.git`
+
+4. Elige una carpeta local y pulsa **Clone**.
+5. Usa **Open in Visual Studio Code**.
+
+### Opción B: terminal
+
+```powershell
+git clone https://github.com/juanhoyoss-dev-UAO/Introducci-n-ingenier-a-de-datos.git
+cd Introducci-n-ingenier-a-de-datos
+code .
+```
+
+El archivo `package.json` debe quedar en la carpeta abierta. Compruébalo con:
+
+```powershell
+Get-Item .\package.json
+```
+
+## 4. Instalar dependencias
+
+Desde la carpeta que contiene `package.json`, ejecuta:
+
+```powershell
+npm.cmd ci
+```
+
+`npm.cmd ci` usa `package-lock.json` y reproduce las versiones aprobadas. En PowerShell se recomienda `npm.cmd` porque algunas instalaciones bloquean el script `npm.ps1`; no es necesario cambiar la política de ejecución de Windows.
+
+## 5. Configurar la autenticación local
+
+Cuando el líder confirme que `.env.local` ya no está versionado, crea tu copia local:
+
+```powershell
+Copy-Item .env.example .env.local
+```
+
+Si el archivo ya existe, no muestres ni compartas su contenido. Tras la rotación autorizada, reemplázalo conscientemente con:
+
+```powershell
+Copy-Item .env.example .env.local -Force
+```
+
+Edita `.env.local` en VS Code y configura:
 
 ```dotenv
 ADMIN_USERNAME=ADMIN
@@ -30,110 +103,167 @@ APP_LOG_LEVEL=INFO
 NEXT_PUBLIC_APP_LOG_LEVEL=INFO
 ```
 
-El hash se genera de forma interactiva; la contraseña no se recibe como argumento ni se muestra en la terminal:
+### Crear el hash de contraseña
 
-```bash
-npm run auth:hash
+Ejecuta:
+
+```powershell
+npm.cmd run auth:hash
 ```
 
-Copiar únicamente el hash resultante a `ADMIN_PASSWORD_HASH`. No existen credenciales predeterminadas. `SESSION_SECRET` debe ser distinto de la contraseña y del hash.
+El comando solicita la contraseña de forma interactiva y devuelve un hash `scrypt`. Copia el hash completo a `ADMIN_PASSWORD_HASH`.
 
-Puede generarse un secreto aleatorio de sesión con Node.js:
+El hash **no es la contraseña**. En `/login` debes escribir la contraseña original que elegiste, junto con el usuario `ADMIN`. Para cambiarla, vuelve a ejecutar `npm.cmd run auth:hash`, sustituye el hash y reinicia Next.js.
 
-```bash
-node -e "process.stdout.write(require('node:crypto').randomBytes(48).toString('base64url') + '\n')"
+### Crear el secreto de sesión
+
+Genera un valor aleatorio independiente:
+
+```powershell
+node -e "process.stdout.write(require('node:crypto').randomBytes(48).toString('base64url'))"
 ```
 
-## Datos CSV/JSON
+Copia el resultado a `SESSION_SECRET`. Debe tener al menos 32 bytes y no debe ser la contraseña ni el hash.
 
-- `data/templates`: ocho plantillas CSV con encabezados canónicos.
-- `data/demo/snapshots`: dos snapshots demostrativos versionados.
-- `data/runtime`: snapshots creados durante la ejecución; está ignorado por Git.
+Cada vez que modifiques `.env.local`, detén el servidor con `Ctrl + C` y vuelve a ejecutar `npm.cmd run dev`.
 
-Cada snapshot contiene `metadata.json` y ocho CSV: centros, productos, presentaciones, inventario, necesidades, voluntarios, tiempos e intenciones. El repositorio valida campos, referencias y unicidad antes de usar o publicar un snapshot.
+## 6. Ejecutar la aplicación
 
-Las escrituras internas utilizan `data/runtime/.staging`, releen lo escrito y sólo entonces publican mediante `rename`. Un snapshot existente no se sobrescribe.
-
-## Ejecución y autenticación
-
-```bash
-npm run dev
+```powershell
+npm.cmd run dev
 ```
 
-Abrir `http://localhost:3000`. Sin sesión, la aplicación redirige a `/login`; después de autenticar al administrador entra a `/dashboard`. Allí se puede cambiar de snapshot, filtrar un centro y consultar centros, inventario físico, necesidades, voluntarios, donaciones esperadas y tiempos dirigidos. Usar el botón de cierre de sesión cuando termine la consulta.
+Espera el mensaje de disponibilidad y abre <http://localhost:3000>. La ruta raíz redirige a `/dashboard`; si no existe una sesión válida, el servidor redirige a `/login`.
 
-`APP_LOG_LEVEL` controla el diagnóstico del servidor y `NEXT_PUBLIC_APP_LOG_LEVEL` el del navegador. Admiten `INFO`, `OK`, `WARN`, `ERROR` u `OFF`; si se dejan vacíos, desarrollo muestra detalle desde `INFO` y producción sólo `WARN`/`ERROR`. Los registros no se guardan en archivos ni incluyen contraseñas, cookies, hashes o secretos.
+1. Entra con `ADMIN` y la contraseña original.
+2. Al aprobarse el acceso, el navegador abre `/dashboard`.
+3. Para detener la aplicación, vuelve a la terminal y pulsa `Ctrl + C`.
 
-La sesión se conserva en una cookie firmada `HttpOnly`, `SameSite=Lax`, con cuatro horas de vigencia y `Secure` bajo HTTPS. El servidor verifica firma, vigencia, usuario y rol en cada ruta protegida. Login y logout exigen un encabezado `Origin` del mismo origen para reducir riesgos CSRF.
+## 7. Uso del dashboard
 
-Ejemplo de consumo local con un archivo de cookies temporal:
+El dashboard consulta endpoints reales; la interfaz no abre archivos CSV directamente.
 
-```bash
-curl -i -c session.txt \
-  -H "Origin: http://localhost:3000" \
-  -H "Content-Type: application/json" \
-  --data '{"username":"<usuario>","password":"<contraseña>"}' \
-  http://localhost:3000/api/auth/login
+1. **Snapshot operativo:** elige una jornada. Al cambiarla se cancelan solicitudes anteriores y se limpia el estado para evitar mezclar snapshots.
+2. **Centro visible:** selecciona todos los centros o uno específico.
+3. **Centros:** muestra identificador, nombre, estado, zona y coordinación.
+4. **Inventario:** muestra paquetes físicos por SKU, contenido por paquete, subtotal de la presentación y total confirmado del producto.
+5. **Necesidades:** compara objetivo, inventario confirmado y déficit.
+6. **Voluntarios:** muestra disponibles, requeridos y faltantes.
+7. **Donaciones esperadas:** muestra intenciones anunciadas por separado; una intención pendiente no aumenta el inventario confirmado.
+8. **Tiempos de traslado:** muestra tiempos dirigidos; origen → destino no implica el tiempo inverso.
+9. **Cerrar sesión:** elimina la cookie del navegador y vuelve a `/login`.
 
-curl -b session.txt http://localhost:3000/api/snapshots
+Los datos versionados se encuentran en `data/demo/snapshots`. Cada snapshot tiene `metadata.json` y ocho CSV. `data/runtime` está destinado a datos locales generados y no debe versionarse.
 
-curl -i -b session.txt -c session.txt \
-  -X POST -H "Origin: http://localhost:3000" \
-  http://localhost:3000/api/auth/logout
+## 8. Diagnóstico
+
+### Terminal de VS Code
+
+Abre **Terminal → New Terminal**. Los registros usan niveles:
+
+- `INFO`: inicio o contexto de una operación.
+- `OK`: operación finalizada correctamente.
+- `WARN`: rechazo o condición recuperable.
+- `ERROR`: fallo no recuperado.
+
+Los módulos son `AUTH`, `API`, `SERVICE`, `REPOSITORY` y `UI`. El servidor añade `X-Request-Id` a las respuestas instrumentadas; el mismo identificador aparece en las trazas de API, servicio y repositorio.
+
+`APP_LOG_LEVEL` controla el servidor y `NEXT_PUBLIC_APP_LOG_LEVEL` el navegador. Admiten `INFO`, `OK`, `WARN`, `ERROR` y `OFF`. Sin configuración, desarrollo usa `INFO` y producción `WARN`.
+
+### Console y Network del navegador
+
+1. Pulsa `F12`.
+2. Abre **Console** para ver navegación, carga, filtros y errores de UI.
+3. Abre **Network**, recarga y selecciona una solicitud `/api/...`.
+4. Revisa **Status**, **Response** y el encabezado `X-Request-Id`.
+5. Busca ese ID en la terminal para seguir la operación completa.
+
+## 9. Errores comunes
+
+| Síntoma | Causa probable | Solución verificable |
+|---|---|---|
+| `npm.ps1 cannot be loaded` | PowerShell bloquea scripts `.ps1` | Usa `npm.cmd ci` y `npm.cmd run dev`; no cambies la política del sistema. |
+| `node`, `npm.cmd` o `git` no se reconoce | Herramienta no instalada o terminal antigua | Instala la herramienta, reinicia la terminal y verifica su versión. |
+| `Cannot find module` | Dependencias ausentes o incompletas | Ejecuta `npm.cmd ci` desde la carpeta de `package.json`. |
+| `.env.local` no existe | No se copió la plantilla | Ejecuta `Copy-Item .env.example .env.local` después de la corrección de seguridad. |
+| Aparece `.env.local.txt` | Windows ocultó la extensión | Activa **Extensiones de nombre de archivo** y renombra el archivo exactamente a `.env.local`. |
+| `AUTH_CONFIGURATION_ERROR` | Falta una variable, el hash es inválido o el secreto es corto | Revisa los tres campos, genera de nuevo hash y secreto, y reinicia el servidor. |
+| `401 INVALID_CREDENTIALS` | Usuario o contraseña incorrectos | Usa `ADMIN` y la contraseña original, no el hash. Regenera el hash si es necesario. |
+| Puerto 3000 ocupado | Otro proceso usa el puerto | Detén el servidor anterior con `Ctrl + C`; evita finalizar procesos desconocidos. |
+| `DATABASE_ERROR` o CSV inválido | Encabezado, fila, referencia o estructura incorrecta | Revisa la terminal y valida los ocho CSV contra `src/contracts/schemas/data.ts`. |
+| `SNAPSHOT_NOT_FOUND` | UUID válido pero inexistente | Selecciona un snapshot listado por `/api/snapshots` y verifica su directorio. |
+| `INVALID_SNAPSHOT_ID` | UUID ausente o mal formado | Envía un UUID válido en `snapshotId` o en la ruta. |
+| Error de compilación | Tipo, import o sintaxis incorrectos | Ejecuta `npm.cmd run typecheck`, `npm.cmd run lint` y lee el primer error. |
+
+## 10. Pruebas y verificaciones
+
+Los nombres exactos definidos en `package.json` son:
+
+```powershell
+npm.cmd run test:unit
+npm.cmd run test:csv
+npm.cmd run test:http
+npm.cmd run lint
+npm.cmd run typecheck
+npm.cmd run build
 ```
 
-No versionar `session.txt`. El logout elimina la cookie del cliente; como las sesiones son firmadas y no se registran en una base central, un token copiado previamente no tiene revocación individual inmediata y continúa siendo verificable hasta vencer. Rotar `SESSION_SECRET` invalida todas las sesiones.
+- `test:unit`: dominio, autenticación, logger y modelos de vista.
+- `test:csv`: lectura, escritura, integridad y seguridad de rutas.
+- `test:http`: servidor Next.js real, credenciales efímeras y copias temporales de los snapshots.
+- `lint`: reglas ESLint/Next.
+- `typecheck`: compilación TypeScript sin emitir archivos.
+- `build`: compilación optimizada de producción.
 
-## API
+Para ejecutar un archivo específico:
 
-`GET /api/health` es público. Estas rutas de autenticación son locales:
-
-- `POST /api/auth/login`
-- `POST /api/auth/logout`
-- `GET /api/auth/me`
-
-Las rutas operativas requieren una sesión administrativa válida:
-
-- `GET /api/snapshots`
-- `GET /api/snapshots/{id}`
-- `GET /api/centers?snapshotId={id}`
-- `GET /api/products?snapshotId={id}`
-- `GET /api/travel-times?snapshotId={id}`
-- `GET /api/dashboard?snapshotId={id}`
-
-Cada respuesta instrumentada incluye `X-Request-Id`. En desarrollo, ese identificador correlaciona el recorrido API → servicio → repositorio CSV → resultado.
-
-El snapshot principal es `10000000-0000-4000-8000-000000000001`. Sus seis centros y los resultados del dashboard proceden de archivos CSV reales.
-
-## Pruebas
-
-```bash
-npm run test:unit
-npm run test:csv
-npm run test:http
-npm run lint
-npm run typecheck
-npm run build
+```powershell
+npx.cmd vitest run tests/unit/inventory.test.ts
 ```
 
-`test:http` crea credenciales efímeras, copia los dos snapshots a una raíz temporal ignorada, inicia un servidor Next.js en un puerto local y lo cierra al terminar. No usa mocks de repositorio, secretos reales ni `data/runtime` personal.
+No declares una prueba aprobada si fue omitida, agotó el tiempo o no pudo iniciar el servidor.
 
-## Estructura y colaboración
+## 11. Trabajo con ramas
 
-- `src/app/api`: contratos HTTP y endpoints de autenticación/consulta.
-- `src/app/login`: formulario local y redirección posterior a la autenticación.
-- `src/app/dashboard`: consola protegida, composición de endpoints y modelos de vista puros.
-- `src/lib/logger.ts` y `src/server/observability`: diagnóstico central y contexto por petición.
-- `src/server/auth`: hash `scrypt`, configuración, firma y autorización.
-- `src/server/repositories`: interfaz de acceso y repositorio CSV.
-- `src/server/storage`: lectura, serialización y controles de archivos.
-- `src/contracts` y `src/domain`: validaciones, tipos y fórmulas compartidas.
-- `data/templates` y `data/demo`: datos versionados; modificar sólo con revisión.
-- `data/runtime`: datos locales no versionados.
-- `tests`: pruebas unitarias, integración CSV y HTTP real aislado.
+Una rama es una línea aislada de cambios. Cada compañero debe partir del commit común aprobado por el líder y no trabajar directamente sobre `main`.
 
-Los componentes visuales deben consumir servicios o endpoints; no deben leer archivos ni duplicar fórmulas.
+```powershell
+git status
+git branch --show-current
+git switch -c feature/nombre-de-la-mision
+```
 
-## Estado conocido
+Después de una modificación pequeña y validada:
 
-El Bloque D0 está completo sobre el checkpoint C2. La consola protegida explora ambos snapshots y sus seis secciones con datos CSV reales; el cambio de snapshot evita mezclar respuestas, el filtro de centro es recuperable y el inventario distingue paquetes, subtotal por presentación y total agregado por producto. Aprobaron 22 casos unitarios, 25 casos CSV y 14 casos HTTP reales, además de lint, typecheck, build, `git diff --check` y la validación visual en navegador real. El resumen reproducible está en `docs/INFORME_D0.md`.
+```powershell
+git diff
+git status
+git add ruta\del\archivo
+git commit -m "Describe el cambio"
+```
+
+Compara tu rama con la base acordada:
+
+```powershell
+git diff main...HEAD
+```
+
+Antes de tocar archivos clasificados como **COORDINADO** o **PROTEGIDO**, solicita revisión del líder. Entrega el objetivo, archivos modificados, pruebas ejecutadas y capturas o pasos observables. No hagas merge ni push si la misión no lo autoriza.
+
+## 12. Mapa del proyecto
+
+- `src/app`: páginas, dashboard y endpoints App Router.
+- `src/contracts`: esquemas Zod y tipos compartidos.
+- `src/domain`: fórmulas puras de inventario, eventos y traslados.
+- `src/server/auth`: configuración, scrypt, tokens y autorización.
+- `src/server/services`: casos de uso y adaptación HTTP.
+- `src/server/repositories`: interfaz y persistencia CSV activa.
+- `src/server/storage`: lectura/escritura segura de archivos.
+- `src/lib/logger.ts`: registro centralizado.
+- `data/templates`: encabezados canónicos.
+- `data/demo/snapshots`: dos jornadas demostrativas versionadas.
+- `data/runtime`: datos locales ignorados por Git.
+- `tests`: suites unitarias, CSV y HTTP.
+- `scripts/generate-admin-password-hash.mjs`: generación interactiva del hash.
+
+Lee primero [el contexto para IA](docs/CONTEXTO_IA.md), después [el informe técnico maestro](docs/INFORME_TECNICO_MAESTRO.md) y finalmente [el catálogo de tareas](docs/CATALOGO_TAREAS_TECNICAS.md) antes de pedir cambios a un asistente.
