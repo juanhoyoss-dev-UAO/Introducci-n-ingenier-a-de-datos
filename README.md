@@ -1,8 +1,8 @@
 # Redes de Ayuda
 
-Prototipo académico para coordinar centros de acopio en Cali. La persistencia operativa usa snapshots CSV/JSON locales y la autenticación administrativa es local: no requiere Supabase, PostgreSQL, Docker ni servicios externos.
+Prototipo académico para coordinar centros de acopio en Cali. La persistencia operativa usa snapshots CSV/JSON locales, la autenticación administrativa es local y `/dashboard` ofrece una consola de inspección de sólo lectura. No requiere Supabase, PostgreSQL, Docker ni servicios externos.
 
-No incluye importador Excel, dashboard visual, endpoints de escritura ni motor interactivo de simulación.
+No incluye importador Excel, dashboard definitivo con gráficos, endpoints de escritura ni motor interactivo de simulación.
 
 ## Requisitos
 
@@ -23,9 +23,11 @@ npm ci
 Copiar `.env.example` como `.env.local`. No versionar `.env.local` ni credenciales reales.
 
 ```dotenv
-ADMIN_USERNAME=
+ADMIN_USERNAME=ADMIN
 ADMIN_PASSWORD_HASH=
 SESSION_SECRET=
+APP_LOG_LEVEL=INFO
+NEXT_PUBLIC_APP_LOG_LEVEL=INFO
 ```
 
 El hash se genera de forma interactiva; la contraseña no se recibe como argumento ni se muestra en la terminal:
@@ -58,7 +60,9 @@ Las escrituras internas utilizan `data/runtime/.staging`, releen lo escrito y s�
 npm run dev
 ```
 
-Abrir `http://localhost:3000/login`, introducir `ADMIN_USERNAME` y la contraseña original, y usar el botón de cierre de sesión cuando termine la consulta.
+Abrir `http://localhost:3000`. Sin sesión, la aplicación redirige a `/login`; después de autenticar al administrador entra a `/dashboard`. Allí se puede cambiar de snapshot, filtrar un centro y consultar centros, inventario físico, necesidades, voluntarios, donaciones esperadas y tiempos dirigidos. Usar el botón de cierre de sesión cuando termine la consulta.
+
+`APP_LOG_LEVEL` controla el diagnóstico del servidor y `NEXT_PUBLIC_APP_LOG_LEVEL` el del navegador. Admiten `INFO`, `OK`, `WARN`, `ERROR` u `OFF`; si se dejan vacíos, desarrollo muestra detalle desde `INFO` y producción sólo `WARN`/`ERROR`. Los registros no se guardan en archivos ni incluyen contraseñas, cookies, hashes o secretos.
 
 La sesión se conserva en una cookie firmada `HttpOnly`, `SameSite=Lax`, con cuatro horas de vigencia y `Secure` bajo HTTPS. El servidor verifica firma, vigencia, usuario y rol en cada ruta protegida. Login y logout exigen un encabezado `Origin` del mismo origen para reducir riesgos CSRF.
 
@@ -97,6 +101,8 @@ Las rutas operativas requieren una sesión administrativa válida:
 - `GET /api/travel-times?snapshotId={id}`
 - `GET /api/dashboard?snapshotId={id}`
 
+Cada respuesta instrumentada incluye `X-Request-Id`. En desarrollo, ese identificador correlaciona el recorrido API → servicio → repositorio CSV → resultado.
+
 El snapshot principal es `10000000-0000-4000-8000-000000000001`. Sus seis centros y los resultados del dashboard proceden de archivos CSV reales.
 
 ## Pruebas
@@ -115,7 +121,9 @@ npm run build
 ## Estructura y colaboración
 
 - `src/app/api`: contratos HTTP y endpoints de autenticación/consulta.
-- `src/app/login`: formulario local de login, consulta de sesión y logout.
+- `src/app/login`: formulario local y redirección posterior a la autenticación.
+- `src/app/dashboard`: consola protegida, composición de endpoints y modelos de vista puros.
+- `src/lib/logger.ts` y `src/server/observability`: diagnóstico central y contexto por petición.
 - `src/server/auth`: hash `scrypt`, configuración, firma y autorización.
 - `src/server/repositories`: interfaz de acceso y repositorio CSV.
 - `src/server/storage`: lectura, serialización y controles de archivos.
@@ -128,4 +136,4 @@ Los componentes visuales deben consumir servicios o endpoints; no deben leer arc
 
 ## Estado conocido
 
-El Bloque C2 está completo: reemplazó la autenticación Supabase por credenciales y sesiones firmadas locales. Después de una instalación limpia con `npm ci`, aprobaron 14 casos unitarios, 25 casos CSV, 12 casos HTTP reales, lint, typecheck, build y `git diff --check`. La matriz T01–T14 y la evidencia reproducible están en `docs/PRUEBAS_C2.md`.
+El Bloque D0 está completo sobre el checkpoint C2. La consola protegida explora ambos snapshots y sus seis secciones con datos CSV reales; el cambio de snapshot evita mezclar respuestas, el filtro de centro es recuperable y el inventario distingue paquetes, subtotal por presentación y total agregado por producto. Aprobaron 22 casos unitarios, 25 casos CSV y 14 casos HTTP reales, además de lint, typecheck, build, `git diff --check` y la validación visual en navegador real. El resumen reproducible está en `docs/INFORME_D0.md`.

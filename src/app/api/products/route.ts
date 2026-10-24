@@ -6,7 +6,7 @@ import {
 } from "@/server/services/http";
 
 export async function GET(request: Request) {
-  return withAdministrator(async () => {
+  return withAdministrator(request, async () => {
     const snapshotId = parseSnapshotId(
       new URL(request.url).searchParams.get("snapshotId"),
     );

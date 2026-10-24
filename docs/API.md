@@ -4,6 +4,8 @@
 
 Las respuestas exitosas usan `{ "data": ..., "meta": ... }`. Los errores usan `{ "error": { "code": "...", "message": "...", "details": ... } }` y no exponen rutas internas, contenido de archivos, trazas, hashes ni secretos.
 
+Las respuestas instrumentadas incluyen `X-Request-Id`, generado por el servidor. En desarrollo, el mismo identificador aparece en los registros de API, servicio, repositorio y resultado. El cliente no puede imponerlo y no cambia el cuerpo del contrato.
+
 `/api/health` es público. Las rutas operativas verifican en cada petición una cookie local firmada y el rol administrador: una sesión ausente o inválida recibe 401 y una sesión válida sin privilegios recibe 403.
 
 ## Autenticación local
@@ -86,6 +88,8 @@ Fragmento de `/api/dashboard` para `C01` y agua del snapshot A:
 ```
 
 El dashboard incluye `centros`, `donaciones_esperadas` y `candidatos_traslado`. Cada candidato identifica producto, origen, destino, minutos, paquetes completos por SKU y total en unidad base. La respuesta no modifica los CSV ni el inventario.
+
+La consola D0 no añadió campos ni endpoints: relaciona `dashboard.centros[].productos[].existencias` con las presentaciones de `/api/products`, conserva las intenciones separadas y usa `/api/travel-times` sin inferir rutas inversas.
 
 ## Códigos de error
 

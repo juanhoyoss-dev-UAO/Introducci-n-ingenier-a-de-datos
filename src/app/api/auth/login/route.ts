@@ -12,6 +12,8 @@ import {
   signSessionToken,
   validateMutationOrigin,
 } from "@/server/auth/session";
+import { serverLog } from "@/server/observability/request-context";
+import { withHttpRequest } from "@/server/services/http";
 
 const loginRequestSchema = z
   .object({
@@ -27,8 +29,11 @@ function errorResponse(status: number, code: string, message: string) {
   );
 }
 
-export async function POST(request: Request) {
+async function handleLogin(request: Request) {
   if (!validateMutationOrigin(request)) {
+    serverLog("WARN", "AUTH", "Inicio de sesión rechazado", {
+      reason: "invalid_origin",
+    });
     return errorResponse(
       403,
       "INVALID_ORIGIN",
@@ -40,11 +45,17 @@ export async function POST(request: Request) {
   try {
     body = await request.json();
   } catch {
+    serverLog("WARN", "AUTH", "Inicio de sesión rechazado", {
+      reason: "invalid_request",
+    });
     return errorResponse(400, "INVALID_REQUEST", "La solicitud no es válida.");
   }
 
   const parsedBody = loginRequestSchema.safeParse(body);
   if (!parsedBody.success) {
+    serverLog("WARN", "AUTH", "Inicio de sesión rechazado", {
+      reason: "invalid_request",
+    });
     return errorResponse(400, "INVALID_REQUEST", "La solicitud no es válida.");
   }
 
@@ -60,6 +71,9 @@ export async function POST(request: Request) {
     );
 
     if (!passwordIsValid || !usernameIsValid) {
+      serverLog("WARN", "AUTH", "Inicio de sesión rechazado", {
+        reason: "invalid_credentials",
+      });
       return errorResponse(
         401,
         "INVALID_CREDENTIALS",
@@ -90,12 +104,22 @@ export async function POST(request: Request) {
       token,
       sessionCookieOptions(request, claims.exp),
     );
+    serverLog("OK", "AUTH", "Inicio de sesión aceptado", {
+      role: claims.role,
+    });
     return response;
   } catch {
+    serverLog("ERROR", "AUTH", "Autenticación no disponible", {
+      errorCode: "AUTH_CONFIGURATION_ERROR",
+    });
     return errorResponse(
       500,
       "AUTH_CONFIGURATION_ERROR",
       "La autenticación local no está disponible.",
     );
   }
+}
+
+export function POST(request: Request) {
+  return withHttpRequest(request, "AUTH", () => handleLogin(request));
 }

@@ -114,3 +114,24 @@
 - El build de Next.js aprobó con 13 páginas/rutas y `git diff --check` no detectó errores.
 - El sandbox de herramientas bloqueó inicialmente la escritura de `.next` con EPERM; el mismo build ejecutado fuera de ese aislamiento compiló correctamente. No es un requisito ni un fallo del proyecto.
 - Estado: C2 completo, pendiente únicamente de revisión humana y sin iniciar módulos posteriores.
+
+## 2026-10-24 — Bloque D0
+
+### D0.1 — Consola administrativa
+
+- Se creó `/dashboard` protegido en servidor y se conectó el login con la navegación administrativa.
+- La interfaz explora ambos snapshots, muestra seis secciones y aplica filtro por centro.
+- El inventario distingue paquetes físicos, subtotal por presentación y total agregado por producto; las donaciones permanecen separadas.
+
+### D0.2 — Diagnóstico
+
+- Se añadió un logger central con niveles y módulos cerrados, configuración por entorno y sanitización.
+- Cada petición instrumentada genera `requestId`, lo expone en `X-Request-Id` y lo conserva entre API, servicios y repositorio CSV.
+- El navegador registra navegación, carga, snapshot, filtro y errores sin credenciales ni tokens.
+
+### D0.3 — Verificación
+
+- Aprobaron 22 pruebas unitarias, 25 CSV y 14 HTTP reales.
+- Aprobaron lint, TypeScript, build y `git diff --check`.
+- La inspección en navegador real comprobó login/logout, snapshot A/B, seis secciones, 12.000/20.000/8.000/6.000, filtro, aislamiento 12.000/2.700 y ambas consolas.
+- Estado: D0 completo en `feature/admin-inspector`, sin commit ni push y sin iniciar D1.

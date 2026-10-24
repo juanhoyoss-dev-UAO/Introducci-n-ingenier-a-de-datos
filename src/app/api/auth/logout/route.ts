@@ -5,9 +5,14 @@ import {
   sessionCookieOptions,
   validateMutationOrigin,
 } from "@/server/auth/session";
+import { serverLog } from "@/server/observability/request-context";
+import { withHttpRequest } from "@/server/services/http";
 
-export async function POST(request: Request) {
+async function handleLogout(request: Request) {
   if (!validateMutationOrigin(request)) {
+    serverLog("WARN", "AUTH", "Cierre de sesión rechazado", {
+      reason: "invalid_origin",
+    });
     return NextResponse.json(
       {
         error: {
@@ -31,5 +36,10 @@ export async function POST(request: Request) {
     "",
     sessionCookieOptions(request, 0),
   );
+  serverLog("OK", "AUTH", "Sesión cerrada");
   return response;
+}
+
+export function POST(request: Request) {
+  return withHttpRequest(request, "AUTH", () => handleLogout(request));
 }

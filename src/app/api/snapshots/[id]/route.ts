@@ -1,4 +1,5 @@
 import { snapshotIdSchema } from "@/contracts/schemas/queries";
+import { setRequestSnapshot } from "@/server/observability/request-context";
 import { ApiError } from "@/server/services/errors";
 import { getSnapshot } from "@/server/services/operations";
 import { successResponse, withAdministrator } from "@/server/services/http";
@@ -8,10 +9,10 @@ interface SnapshotRouteContext {
 }
 
 export async function GET(
-  _request: Request,
+  request: Request,
   context: SnapshotRouteContext,
 ) {
-  return withAdministrator(async () => {
+  return withAdministrator(request, async () => {
     const { id } = await context.params;
     const result = snapshotIdSchema.safeParse(id);
     if (!result.success) {
@@ -23,6 +24,7 @@ export async function GET(
       );
     }
 
+    setRequestSnapshot(result.data);
     const snapshot = await getSnapshot(result.data);
     return successResponse(snapshot);
   });

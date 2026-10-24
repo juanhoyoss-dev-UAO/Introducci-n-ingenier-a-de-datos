@@ -6,8 +6,10 @@ import {
   SESSION_COOKIE_NAME,
   verifySessionToken,
 } from "@/server/auth/session";
+import { serverLog } from "@/server/observability/request-context";
+import { withHttpRequest } from "@/server/services/http";
 
-export async function GET() {
+async function handleSessionStatus() {
   try {
     const configuration = getAuthConfiguration();
     const cookieStore = await cookies();
@@ -16,7 +18,7 @@ export async function GET() {
       ? verifySessionToken(token, configuration.sessionSecret)
       : null;
 
-    return NextResponse.json(
+    const response = NextResponse.json(
       {
         data: session
           ? {
@@ -29,7 +31,14 @@ export async function GET() {
       },
       { status: 200, headers: { "Cache-Control": "no-store" } },
     );
+    serverLog("OK", "AUTH", "Estado de sesión consultado", {
+      authenticated: Boolean(session),
+    });
+    return response;
   } catch {
+    serverLog("ERROR", "AUTH", "Estado de sesión no disponible", {
+      errorCode: "AUTH_CONFIGURATION_ERROR",
+    });
     return NextResponse.json(
       {
         error: {
@@ -40,4 +49,8 @@ export async function GET() {
       { status: 500, headers: { "Cache-Control": "no-store" } },
     );
   }
+}
+
+export function GET(request: Request) {
+  return withHttpRequest(request, "AUTH", handleSessionStatus);
 }

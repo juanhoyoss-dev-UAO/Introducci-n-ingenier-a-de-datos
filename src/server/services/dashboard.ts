@@ -12,12 +12,15 @@ import {
   getOperationsRepository,
   type OperationsRepository,
 } from "@/server/repositories/operations";
+import { serverLog } from "@/server/observability/request-context";
 import { ApiError } from "./errors";
 
 export async function getDashboard(
   snapshotId: string,
   repository: OperationsRepository = getOperationsRepository(),
 ) {
+  const startedAt = performance.now();
+  serverLog("INFO", "SERVICE", "Calculando indicadores");
   const source = await repository.getDashboardSource(snapshotId);
   if (!source.snapshot) {
     throw new ApiError(404, "SNAPSHOT_NOT_FOUND", "El snapshot no existe.");
@@ -120,11 +123,18 @@ export async function getDashboard(
     };
   });
 
-  return {
+  const result = {
     snapshot: source.snapshot,
     centros: centers,
     donaciones_esperadas: source.expectedDonations,
     candidatos_traslado: recommendTransfers(balances, source.travelTimes),
   };
+  serverLog("OK", "SERVICE", "Indicadores calculados", {
+    centers: result.centros.length,
+    durationMs: Math.round(performance.now() - startedAt),
+    expectedDonations: result.donaciones_esperadas.length,
+    transferCandidates: result.candidatos_traslado.length,
+  });
+  return result;
 }
 

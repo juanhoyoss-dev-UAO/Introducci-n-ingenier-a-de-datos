@@ -16,7 +16,6 @@ const SNAPSHOT_A = "10000000-0000-4000-8000-000000000001";
 const SNAPSHOT_B = "10000000-0000-4000-8000-000000000002";
 const UNKNOWN_SNAPSHOT = "10000000-0000-4000-8000-000000000099";
 const ADMIN_USERNAME = "administrador-pruebas";
-const ADMIN_PASSWORD = "Prueba-C2-local!2026";
 
 interface ApiSuccess<T> {
   data: T;
@@ -33,7 +32,14 @@ interface SnapshotResponse {
 
 interface ProductResponse {
   producto_id: string;
-  presentaciones: Array<{ sku_id: string }>;
+  nombre: string;
+  unidad_base: "ml" | "g" | "unidad";
+  presentaciones: Array<{
+    sku_id: string;
+    producto_id: string;
+    nombre: string;
+    contenido_por_paquete: number;
+  }>;
 }
 
 interface DashboardResponse {
@@ -45,7 +51,20 @@ interface DashboardResponse {
       objetivo_unidad_base: number;
       deficit_confirmado_unidad_base: number;
       donaciones_esperadas_unidad_base: number;
+      existencias: Array<{
+        sku_id: string;
+        cantidad_paquetes: number;
+        contenido_por_paquete: number;
+      }>;
     }>;
+  }>;
+  donaciones_esperadas: Array<{
+    intencion_id: string;
+    centro_id: string;
+    sku_id: string;
+    cantidad_paquetes: number;
+    llegada_prevista: string;
+    estado: string;
   }>;
 }
 
@@ -98,6 +117,8 @@ describe("HTTP real C2", () => {
   let serverProcess: ChildProcess | undefined;
   let serverOutput = "";
   let administratorCookie = "";
+  let administratorPassword = "";
+  let rejectedPassword = "";
   let sessionSecret = "";
 
   async function api<T>(requestPath: string, options: RequestOptions = {}) {
@@ -143,6 +164,17 @@ describe("HTTP real C2", () => {
     throw new Error(`Next.js no inició dentro del plazo.\n${serverOutput}`);
   }
 
+  async function waitForServerOutput(predicate: () => boolean) {
+    const deadline = Date.now() + 5_000;
+    while (Date.now() < deadline) {
+      if (predicate()) {
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    throw new Error(`No apareció la traza esperada.\n${serverOutput}`);
+  }
+
   beforeAll(async () => {
     const runtimeTestsRoot = path.join(
       process.cwd(),
@@ -159,8 +191,12 @@ describe("HTTP real C2", () => {
       recursive: true,
     });
 
+    administratorPassword = randomBytes(32).toString("base64url");
+    rejectedPassword = randomBytes(32).toString("base64url");
     sessionSecret = randomBytes(48).toString("base64url");
-    const administratorPasswordHash = await createPasswordHash(ADMIN_PASSWORD);
+    const administratorPasswordHash = await createPasswordHash(
+      administratorPassword,
+    );
     const port = await reserveLocalPort();
     baseUrl = `http://127.0.0.1:${port}`;
 
@@ -239,7 +275,7 @@ describe("HTTP real C2", () => {
     >("/api/auth/login", {
       method: "POST",
       origin: baseUrl,
-      body: { username: ADMIN_USERNAME, password: ADMIN_PASSWORD },
+      body: { username: ADMIN_USERNAME, password: administratorPassword },
     });
 
     expect(response.status, JSON.stringify(body)).toBe(200);
@@ -271,11 +307,44 @@ describe("HTTP real C2", () => {
     });
   });
 
+  it("D0-T01 protege el dashboard y permite entrar al administrador", async () => {
+    const anonymous = await fetch(`${baseUrl}/dashboard`, {
+      redirect: "manual",
+    });
+    const anonymousBody = await anonymous.text();
+    const location = anonymous.headers.get("location");
+
+    expect([303, 307, 308]).toContain(anonymous.status);
+    expect(location).toBeTruthy();
+    expect(new URL(location ?? "/", baseUrl).pathname).toBe("/login");
+    expect(anonymousBody).not.toMatch(
+      /Jornada demostrativa|AGUA-600|12[.,]?000|20[.,]?000/i,
+    );
+
+    const authenticated = await fetch(`${baseUrl}/dashboard`, {
+      headers: { Cookie: administratorCookie },
+      redirect: "manual",
+    });
+    const authenticatedBody = await authenticated.text();
+
+    expect(authenticated.status).toBe(200);
+    for (const section of [
+      "Centros",
+      "Inventario",
+      "Necesidades",
+      "Voluntarios",
+      "Donaciones esperadas",
+      "Tiempos de traslado",
+    ]) {
+      expect(authenticatedBody).toContain(section);
+    }
+  });
+
   it("T02 rechaza credenciales incorrectas sin revelar el campo fallido", async () => {
     const { response, body } = await api<ApiFailure>("/api/auth/login", {
       method: "POST",
       origin: baseUrl,
-      body: { username: ADMIN_USERNAME, password: "incorrecta" },
+      body: { username: ADMIN_USERNAME, password: rejectedPassword },
     });
     expect(response.status, JSON.stringify(body)).toBe(401);
     expect(body.error).toEqual({
@@ -288,7 +357,7 @@ describe("HTTP real C2", () => {
   it("rechaza mutaciones de sesión sin un Origin local exacto", async () => {
     const missingOrigin = await api<ApiFailure>("/api/auth/login", {
       method: "POST",
-      body: { username: ADMIN_USERNAME, password: ADMIN_PASSWORD },
+      body: { username: ADMIN_USERNAME, password: administratorPassword },
     });
     const foreignOrigin = await api<ApiFailure>("/api/auth/logout", {
       method: "POST",
@@ -338,7 +407,7 @@ describe("HTTP real C2", () => {
     expect(detail.body.data.id).toBe(SNAPSHOT_A);
   });
 
-  it("T06 recupera centros, productos y tiempos desde CSV reales", async () => {
+  it("D0-T03 y D0-T09 recuperan el resumen y los tiempos dirigidos reales", async () => {
     const [centers, products, travelTimes] = await Promise.all([
       api<ApiSuccess<Array<{ centro_id: string }>>>(
         `/api/centers?snapshotId=${SNAPSHOT_A}`,
@@ -348,7 +417,11 @@ describe("HTTP real C2", () => {
         `/api/products?snapshotId=${SNAPSHOT_A}`,
         { cookie: administratorCookie },
       ),
-      api<ApiSuccess<Array<{ origen_id: string; destino_id: string }>>>(
+      api<
+        ApiSuccess<
+          Array<{ origen_id: string; destino_id: string; minutos: number }>
+        >
+      >(
         `/api/travel-times?snapshotId=${SNAPSHOT_A}`,
         { cookie: administratorCookie },
       ),
@@ -366,17 +439,36 @@ describe("HTTP real C2", () => {
     ).toHaveLength(7);
     expect(travelTimes.response.status).toBe(200);
     expect(travelTimes.body.data).toContainEqual(
-      expect.objectContaining({ origen_id: "C02", destino_id: "C01" }),
+      expect.objectContaining({
+        origen_id: "C02",
+        destino_id: "C01",
+        minutos: 15,
+      }),
+    );
+    expect(travelTimes.body.data).toContainEqual(
+      expect.objectContaining({
+        origen_id: "C01",
+        destino_id: "C02",
+        minutos: 20,
+      }),
     );
   });
 
-  it("T07 conserva inventario, objetivo, déficit y donación separados", async () => {
-    const { response, body } = await api<ApiSuccess<DashboardResponse>>(
-      `/api/dashboard?snapshotId=${SNAPSHOT_A}`,
-      { cookie: administratorCookie },
-    );
-    expect(response.status).toBe(200);
-    const water = body.data.centros
+  it("D0-T05 a D0-T07 conserva detalle físico, necesidad y donación separados", async () => {
+    const [dashboard, products] = await Promise.all([
+      api<ApiSuccess<DashboardResponse>>(
+        `/api/dashboard?snapshotId=${SNAPSHOT_A}`,
+        { cookie: administratorCookie },
+      ),
+      api<ApiSuccess<ProductResponse[]>>(
+        `/api/products?snapshotId=${SNAPSHOT_A}`,
+        { cookie: administratorCookie },
+      ),
+    ]);
+    expect(dashboard.response.status).toBe(200);
+    expect(products.response.status).toBe(200);
+
+    const water = dashboard.body.data.centros
       .find((center) => center.centro_id === "C01")
       ?.productos.find((product) => product.producto_id === "P01");
     expect(water).toMatchObject({
@@ -385,6 +477,94 @@ describe("HTTP real C2", () => {
       deficit_confirmado_unidad_base: 8_000,
       donaciones_esperadas_unidad_base: 6_000,
     });
+    expect(water?.existencias).toHaveLength(2);
+    expect(water?.existencias).toEqual(
+      expect.arrayContaining([
+        {
+          sku_id: "AGUA-600",
+          cantidad_paquetes: 10,
+          contenido_por_paquete: 600,
+        },
+        {
+          sku_id: "AGUA-1500",
+          cantidad_paquetes: 4,
+          contenido_por_paquete: 1_500,
+        },
+      ]),
+    );
+    const confirmedFromPhysicalPackages =
+      water?.existencias.reduce(
+        (total, row) =>
+          total + row.cantidad_paquetes * row.contenido_por_paquete,
+        0,
+      ) ?? 0;
+    expect(confirmedFromPhysicalPackages).toBe(12_000);
+
+    const announcedDonation = dashboard.body.data.donaciones_esperadas.find(
+      (donation) => donation.intencion_id === "D01",
+    );
+    expect(announcedDonation).toMatchObject({
+      centro_id: "C01",
+      sku_id: "AGUA-600",
+      cantidad_paquetes: 10,
+      estado: "pendiente",
+    });
+    const announcedPresentation = products.body.data
+      .flatMap((product) => product.presentaciones)
+      .find((presentation) => presentation.sku_id === announcedDonation?.sku_id);
+    expect(announcedPresentation?.contenido_por_paquete).toBe(600);
+    expect(
+      (announcedDonation?.cantidad_paquetes ?? 0) *
+        (announcedPresentation?.contenido_por_paquete ?? 0),
+    ).toBe(6_000);
+    expect(water?.inventario_confirmado_unidad_base).toBe(12_000);
+  });
+
+  it("D0-T10 correlaciona API, servicio, repositorio y resultado", async () => {
+    const { response } = await api<ApiSuccess<DashboardResponse>>(
+      `/api/dashboard?snapshotId=${SNAPSHOT_A}`,
+      { cookie: administratorCookie },
+    );
+    const requestId = response.headers.get("x-request-id");
+
+    expect(response.status).toBe(200);
+    expect(requestId).toMatch(/^[0-9a-f-]{36}$/i);
+    await waitForServerOutput(() =>
+      serverOutput
+        .split(/\r?\n/)
+        .some(
+          (line) =>
+            line.includes(requestId ?? "") &&
+            line.includes("[OK] [API] Petición completada"),
+        ),
+    );
+
+    const trace = serverOutput
+      .split(/\r?\n/)
+      .filter((line) => line.includes(requestId ?? ""));
+    const apiStart = trace.findIndex((line) =>
+      line.includes("[INFO] [API] Petición recibida"),
+    );
+    const service = trace.findIndex((line) =>
+      line.includes("[INFO] [SERVICE] Calculando indicadores"),
+    );
+    const repository = trace.findIndex((line) =>
+      line.includes("[OK] [REPOSITORY] Snapshot leído"),
+    );
+    const result = trace.findIndex((line) =>
+      line.includes("[OK] [API] Petición completada"),
+    );
+
+    expect(apiStart).toBeGreaterThanOrEqual(0);
+    expect(service).toBeGreaterThan(apiStart);
+    expect(repository).toBeGreaterThan(service);
+    expect(result).toBeGreaterThan(repository);
+    expect(trace.join("\n")).toContain(`snapshot=${SNAPSHOT_A}`);
+    expect(trace.join("\n")).not.toContain(administratorPassword);
+    expect(trace.join("\n")).not.toContain(sessionSecret);
+    expect(trace.join("\n")).not.toMatch(
+      /redes_ayuda_session|authorization|stack|\\src\\|\/src\//i,
+    );
   });
 
   it("T08 mantiene aislados los datos de ambos snapshots", async () => {
@@ -468,7 +648,7 @@ describe("HTTP real C2", () => {
     expect(afterLogout.body.error.code).toBe("UNAUTHENTICATED");
   });
 
-  it("T10 normaliza errores 400, 404 y 500 sin filtrar internals", async () => {
+  it("D0-T11 normaliza snapshots inválidos y errores sin filtrar internals", async () => {
     const missing = await api<ApiFailure>("/api/centers", {
       cookie: administratorCookie,
     });
@@ -485,8 +665,14 @@ describe("HTTP real C2", () => {
     expect(missing.body.error.code).toBe("MISSING_SNAPSHOT_ID");
     expect(malformed.response.status).toBe(400);
     expect(malformed.body.error.code).toBe("INVALID_SNAPSHOT_ID");
+    expect(JSON.stringify(malformed.body)).not.toMatch(
+      /stack|scrypt|cookie|secret|token|\\src\\|\/src\//i,
+    );
     expect(notFound.response.status).toBe(404);
     expect(notFound.body.error.code).toBe("SNAPSHOT_NOT_FOUND");
+    expect(JSON.stringify(notFound.body)).not.toMatch(
+      /stack|scrypt|cookie|secret|token|\\src\\|\/src\//i,
+    );
 
     const corruptedCsv = path.join(demoRoot, SNAPSHOT_A, "productos.csv");
     await writeFile(corruptedCsv, "contenido,invalido\n", "utf8");

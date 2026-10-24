@@ -25,6 +25,24 @@ Route Handler
   -> validación Zod
 ```
 
+## Flujo de la consola D0
+
+```text
+/dashboard (Server Component protegido)
+  -> DashboardClient
+  -> Route Handlers GET
+  -> servicios existentes
+  -> OperationsRepository
+  -> CsvOperationsRepository
+  -> snapshot CSV/JSON validado
+```
+
+La página servidor exige administrador antes de entregar la consola. El componente cliente coordina las consultas, cancela cargas obsoletas y compone modelos de vista sin leer archivos ni recalcular fórmulas de negocio. `view-model.ts` sólo aplana, relaciona y filtra datos ya calculados por el backend.
+
+## Diagnóstico D0
+
+`src/lib/logger.ts` concentra el formato, niveles, módulos, umbral y sanitización. En el servidor, `AsyncLocalStorage` conserva un `requestId` generado localmente y el snapshot de la operación sin cambiar las interfaces de servicios o repositorios. Las respuestas instrumentadas exponen `X-Request-Id`; los logs permanecen en consola y nunca incluyen cuerpos, cookies, tokens, hashes, secretos, rutas absolutas ni archivos CSV completos.
+
 Los Route Handlers conservan parámetros, autorización y formato HTTP. Los servicios coordinan lecturas y cálculos. El repositorio implementa la fuente CSV sin exponer rutas de archivos a la API. `src/domain` mantiene fórmulas puras sin React, Next.js ni persistencia.
 
 ## Autenticación y autorización local
@@ -60,6 +78,9 @@ La escritura valida en memoria, escribe en staging, relee, comprueba que no exis
 | `src/app/api/auth` | Login, logout y consulta de sesión local. |
 | `src/app/api` | Endpoints GET y respuestas HTTP existentes. |
 | `src/app/login` | Formulario local; no permite registro. |
+| `src/app/dashboard` | Consola administrativa protegida y modelos de vista. |
+| `src/lib/logger.ts` | Formato, niveles, módulos y sanitización de diagnóstico. |
+| `src/server/observability` | Contexto y correlación de peticiones HTTP. |
 | `src/server/auth` | Configuración, hash, firma, cookie y comprobación administrativa. |
 | `src/server/repositories` | Interfaz operativa e implementación CSV. |
 | `src/server/storage` | Parseo, serialización, rutas y archivos seguros. |
@@ -73,4 +94,4 @@ La escritura valida en memoria, escribe en staging, relee, comprueba que no exis
 | `tests/integration` | Integración CSV real. |
 | `tests/http` | API real con servidor y datos temporales aislados. |
 
-No se implementaron importador Excel, dashboard visual, mutaciones HTTP de simulación, donantes, mapas o notificaciones.
+No se implementaron importador Excel, dashboard definitivo con gráficos, mutaciones HTTP de simulación, donantes, mapas o notificaciones.

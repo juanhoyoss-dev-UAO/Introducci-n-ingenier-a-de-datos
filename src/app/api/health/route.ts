@@ -1,6 +1,8 @@
-import { successResponse } from "@/server/services/http";
+import { successResponse, withHttpRequest } from "@/server/services/http";
 
-export function GET() {
-  return successResponse({ status: "ok" });
+export function GET(request: Request) {
+  return withHttpRequest(request, "API", async () =>
+    successResponse({ status: "ok" }),
+  );
 }
 

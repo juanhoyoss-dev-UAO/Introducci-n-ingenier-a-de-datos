@@ -57,9 +57,21 @@ El contrato preliminar se amplió con snapshots, reserva, simulaciones y eventos
 | 2026-10-23 | Ejecutar HTTP contra copias CSV temporales mediante raíces configurables del proceso hijo. | Prueba el recorrido real y el error de lectura sin modificar demo ni runtime personal. |
 | 2026-10-23 | Retirar Supabase sólo después de aprobar la autenticación y los endpoints locales. | Respeta una migración reversible; los checkpoints Git conservan la evidencia histórica. |
 
+## Bloque D0
+
+| Fecha | Decisión | Motivo |
+| --- | --- | --- |
+| 2026-10-24 | Proteger `/dashboard` en un Server Component y volver a verificar la sesión desde el cliente. | Evita filtrar datos en HTML y permite reaccionar a una sesión vencida durante la navegación. |
+| 2026-10-24 | Componer la consola con los endpoints existentes, sin ampliar contratos. | Dashboard, productos, centros y tiempos ya contienen todo el detalle requerido. |
+| 2026-10-24 | Elegir el primer snapshot por fecha ascendente e ID. | El dataset A funciona como estado inicial principal sin fijar un UUID en la interfaz. |
+| 2026-10-24 | Cancelar y limpiar cada carga al cambiar de snapshot. | Impide presentar datos del snapshot anterior como si fueran del nuevo. |
+| 2026-10-24 | Mantener transformaciones de vista en funciones puras. | Facilita pruebas sin instalar una biblioteca DOM y no duplica reglas de negocio. |
+| 2026-10-24 | Correlacionar trazas mediante `AsyncLocalStorage`. | Propaga `requestId` sin alterar las firmas públicas de servicios y repositorios. |
+| 2026-10-24 | No añadir dependencias ni persistir logs. | Mantiene D0 pequeño, local y auditable. |
+
 ## Pendientes reales
 
 - Definir persistencia de eventos únicamente cuando se autorice la fase correspondiente; C1 no la declara implementada.
-- No iniciar importador, interfaz ni otros módulos hasta recibir aprobación.
-- Revisar el Bloque C2 completo antes de continuar con otra fase.
+- No iniciar importador, D1 ni otros módulos hasta recibir aprobación.
+- Revisar el Bloque D0 completo antes de continuar con otra fase.
 

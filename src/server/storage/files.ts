@@ -15,6 +15,10 @@ import {
   type SnapshotBundle,
 } from "@/contracts/schemas/data";
 import {
+  serverLog,
+  shouldLogSnapshotBundle,
+} from "@/server/observability/request-context";
+import {
   CSV_COLUMNS,
   CSV_FILE_NAMES,
   parseCsvRows,
@@ -99,7 +103,7 @@ async function readTextFile(snapshotDirectory: string, fileName: string) {
   return readFile(filePath, "utf8");
 }
 
-export async function readSnapshotBundle(
+async function readSnapshotBundleData(
   snapshotDirectory: string,
   expectedSnapshotId: string,
 ): Promise<SnapshotBundle> {
@@ -164,6 +168,57 @@ export async function readSnapshotBundle(
       expectedDonationCsvRowSchema,
     ),
   });
+}
+
+export async function readSnapshotBundle(
+  snapshotDirectory: string,
+  expectedSnapshotId: string,
+): Promise<SnapshotBundle> {
+  const startedAt = performance.now();
+  try {
+    const bundle = await readSnapshotBundleData(
+      snapshotDirectory,
+      expectedSnapshotId,
+    );
+    if (shouldLogSnapshotBundle(expectedSnapshotId)) {
+      serverLog("OK", "REPOSITORY", "Snapshot leído", {
+        durationMs: Math.round(performance.now() - startedAt),
+        files: [
+          "metadata.json",
+          CSV_FILE_NAMES.centers,
+          CSV_FILE_NAMES.products,
+          CSV_FILE_NAMES.presentations,
+          CSV_FILE_NAMES.inventory,
+          CSV_FILE_NAMES.needs,
+          CSV_FILE_NAMES.volunteers,
+          CSV_FILE_NAMES.travelTimes,
+          CSV_FILE_NAMES.expectedDonations,
+        ].join(","),
+        records: [
+          `metadata.json:1`,
+          `${CSV_FILE_NAMES.centers}:${bundle.centers.length}`,
+          `${CSV_FILE_NAMES.products}:${bundle.products.length}`,
+          `${CSV_FILE_NAMES.presentations}:${bundle.presentations.length}`,
+          `${CSV_FILE_NAMES.inventory}:${bundle.inventory.length}`,
+          `${CSV_FILE_NAMES.needs}:${bundle.needs.length}`,
+          `${CSV_FILE_NAMES.volunteers}:${bundle.volunteers.length}`,
+          `${CSV_FILE_NAMES.travelTimes}:${bundle.travelTimes.length}`,
+          `${CSV_FILE_NAMES.expectedDonations}:${bundle.expectedDonations.length}`,
+        ].join(","),
+        result: "ok",
+        snapshot: expectedSnapshotId,
+      });
+    }
+    return bundle;
+  } catch (error) {
+    serverLog("ERROR", "REPOSITORY", "Falló la lectura del snapshot", {
+      durationMs: Math.round(performance.now() - startedAt),
+      error,
+      result: "error",
+      snapshot: expectedSnapshotId,
+    });
+    throw error;
+  }
 }
 
 async function writeExclusive(filePath: string, content: string) {

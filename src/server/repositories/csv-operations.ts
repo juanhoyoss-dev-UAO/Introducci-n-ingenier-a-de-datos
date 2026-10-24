@@ -8,6 +8,7 @@ import {
 } from "@/contracts/schemas/data";
 import { snapshotIdSchema } from "@/contracts/schemas/queries";
 import type { SnapshotRecord } from "@/contracts/types/database";
+import { serverLog } from "@/server/observability/request-context";
 import { RepositoryError } from "@/server/services/errors";
 import {
   readSnapshotBundle,
@@ -151,6 +152,10 @@ export class CsvOperationsRepository implements OperationsRepository {
     const locations = await this.collectLocations();
     const location = locations.get(id);
     if (!location) {
+      serverLog("WARN", "REPOSITORY", "Snapshot no encontrado", {
+        result: "not_found",
+        snapshot: id,
+      });
       return null;
     }
 

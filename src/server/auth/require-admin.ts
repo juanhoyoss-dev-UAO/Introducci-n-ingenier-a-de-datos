@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 
 import { ApiError } from "@/server/services/errors";
+import { serverLog } from "@/server/observability/request-context";
 import { getAuthConfiguration } from "./config";
 import {
   SESSION_COOKIE_NAME,
@@ -23,6 +24,9 @@ export async function requireAdministrator(): Promise<AdministratorContext> {
     : null;
 
   if (!session) {
+    serverLog("WARN", "AUTH", "Autorización denegada", {
+      reason: "unauthenticated",
+    });
     throw new ApiError(401, "UNAUTHENTICATED", "Se requiere iniciar sesión.");
   }
 
@@ -30,6 +34,9 @@ export async function requireAdministrator(): Promise<AdministratorContext> {
     session.role !== "admin" ||
     session.sub !== configuration.administratorUsername
   ) {
+    serverLog("WARN", "AUTH", "Autorización denegada", {
+      reason: "forbidden",
+    });
     throw new ApiError(
       403,
       "FORBIDDEN",
@@ -37,6 +44,9 @@ export async function requireAdministrator(): Promise<AdministratorContext> {
     );
   }
 
+  serverLog("OK", "AUTH", "Autorización administrativa aceptada", {
+    role: session.role,
+  });
   return {
     username: session.sub,
     role: "admin",
