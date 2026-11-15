@@ -103,6 +103,22 @@ export const CSV_COLUMNS = {
     "llegada_prevista",
     "estado",
   ],
+  movements: [
+    "snapshot_id",
+    "movimiento_id",
+    "operacion_id",
+    "tipo",
+    "centro_origen_id",
+    "centro_destino_id",
+    "producto_id",
+    "sku_id",
+    "cantidad_paquetes",
+    "ocurrido_en",
+    "registrado_en",
+    "intencion_id",
+    "snapshot_origen_id",
+    "cantidad_anunciada_paquetes",
+  ],
 } as const;
 
 export const CSV_FILE_NAMES = {
@@ -114,4 +130,5 @@ export const CSV_FILE_NAMES = {
   volunteers: "voluntarios.csv",
   travelTimes: "tiempos.csv",
   expectedDonations: "intenciones.csv",
+  movements: "movimientos.csv",
 } as const;

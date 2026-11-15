@@ -5,6 +5,7 @@ import {
   centerCsvRowSchema,
   expectedDonationCsvRowSchema,
   inventoryCsvRowSchema,
+  movementCsvRowSchema,
   needCsvRowSchema,
   presentationCsvRowSchema,
   productCsvRowSchema,
@@ -103,6 +104,23 @@ async function readTextFile(snapshotDirectory: string, fileName: string) {
   return readFile(filePath, "utf8");
 }
 
+async function readOptionalTextFile(
+  snapshotDirectory: string,
+  fileName: string,
+) {
+  const filePath = resolveWithin(snapshotDirectory, fileName);
+  await requireNoSymlinkComponents(filePath);
+  try {
+    await requireRegularFile(filePath);
+    return await readFile(filePath, "utf8");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      return null;
+    }
+    throw error;
+  }
+}
+
 async function readSnapshotBundleData(
   snapshotDirectory: string,
   expectedSnapshotId: string,
@@ -126,6 +144,7 @@ async function readSnapshotBundleData(
     volunteersText,
     travelTimesText,
     expectedDonationsText,
+    movementsText,
   ] = await Promise.all([
     readTextFile(snapshotDirectory, CSV_FILE_NAMES.centers),
     readTextFile(snapshotDirectory, CSV_FILE_NAMES.products),
@@ -135,6 +154,7 @@ async function readSnapshotBundleData(
     readTextFile(snapshotDirectory, CSV_FILE_NAMES.volunteers),
     readTextFile(snapshotDirectory, CSV_FILE_NAMES.travelTimes),
     readTextFile(snapshotDirectory, CSV_FILE_NAMES.expectedDonations),
+    readOptionalTextFile(snapshotDirectory, CSV_FILE_NAMES.movements),
   ]);
 
   return validateSnapshotBundle({
@@ -167,6 +187,14 @@ async function readSnapshotBundleData(
       CSV_COLUMNS.expectedDonations,
       expectedDonationCsvRowSchema,
     ),
+    movements:
+      movementsText === null
+        ? []
+        : parseCsvRows(
+            movementsText,
+            CSV_COLUMNS.movements,
+            movementCsvRowSchema,
+          ),
   });
 }
 
@@ -193,6 +221,7 @@ export async function readSnapshotBundle(
           CSV_FILE_NAMES.volunteers,
           CSV_FILE_NAMES.travelTimes,
           CSV_FILE_NAMES.expectedDonations,
+          CSV_FILE_NAMES.movements,
         ].join(","),
         records: [
           `metadata.json:1`,
@@ -204,6 +233,7 @@ export async function readSnapshotBundle(
           `${CSV_FILE_NAMES.volunteers}:${bundle.volunteers.length}`,
           `${CSV_FILE_NAMES.travelTimes}:${bundle.travelTimes.length}`,
           `${CSV_FILE_NAMES.expectedDonations}:${bundle.expectedDonations.length}`,
+          `${CSV_FILE_NAMES.movements}:${bundle.movements.length}`,
         ].join(","),
         result: "ok",
         snapshot: expectedSnapshotId,
@@ -268,5 +298,9 @@ export async function writeSnapshotBundle(
   await writeExclusive(
     resolveWithin(snapshotDirectory, CSV_FILE_NAMES.expectedDonations),
     stringifyCsvRows(bundle.expectedDonations, CSV_COLUMNS.expectedDonations),
+  );
+  await writeExclusive(
+    resolveWithin(snapshotDirectory, CSV_FILE_NAMES.movements),
+    stringifyCsvRows(bundle.movements, CSV_COLUMNS.movements),
   );
 }

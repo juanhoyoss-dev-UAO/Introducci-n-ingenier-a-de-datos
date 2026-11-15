@@ -3,9 +3,13 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 
+import type { OperationalUpdate } from "@/contracts/schemas/operational-updates";
+import type { MovementOperation } from "@/contracts/schemas/movement-operations";
 import { logger } from "@/lib/logger";
+import { AdministrativeEditor } from "./components/administrative-editor";
 import { DashboardStatus } from "./components/dashboard-status";
 import { OperationalSummary } from "./components/operational-summary";
+import { MovementEditor } from "./components/movement-editor";
 import {
   centerRows,
   donationRows,
@@ -24,6 +28,8 @@ import type {
   DashboardData,
   DashboardTab,
   HealthState,
+  OperationalUpdateResult,
+  MovementOperationResult,
   ProductRecord,
   SessionState,
   SessionUser,
@@ -38,6 +44,7 @@ const TABS: ReadonlyArray<{ id: DashboardTab; label: string }> = [
   { id: "necesidades", label: "Necesidades" },
   { id: "voluntarios", label: "Voluntarios" },
   { id: "donaciones", label: "Donaciones esperadas" },
+  { id: "movimientos", label: "Movimientos y recepciones" },
   { id: "tiempos", label: "Tiempos de traslado" },
 ];
 
@@ -76,6 +83,35 @@ async function fetchApi<T>(url: string, signal?: AbortSignal): Promise<T> {
       response.status,
       failure.error?.code ?? "REQUEST_ERROR",
       failure.error?.message ?? "No fue posible consultar la información.",
+    );
+  }
+  if (!("data" in body)) {
+    throw new ApiClientError(
+      500,
+      "INVALID_RESPONSE",
+      "El servidor devolvió una respuesta inesperada.",
+    );
+  }
+  return body.data;
+}
+
+async function postApi<T>(url: string, payload: unknown): Promise<T> {
+  const response = await fetch(url, {
+    method: "POST",
+    cache: "no-store",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const body = (await response.json().catch(() => ({}))) as
+    | ApiSuccess<T>
+    | ApiFailure;
+  if (!response.ok) {
+    const failure = body as ApiFailure;
+    throw new ApiClientError(
+      response.status,
+      failure.error?.code ?? "REQUEST_ERROR",
+      failure.error?.message ?? "No fue posible guardar la actualización.",
     );
   }
   if (!("data" in body)) {
@@ -160,6 +196,7 @@ export default function DashboardClient({
   const [loading, setLoading] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [error, setError] = useState("");
+  const [mutationNotice, setMutationNotice] = useState("");
   const [reloadToken, setReloadToken] = useState(0);
 
   useEffect(() => {
@@ -395,6 +432,7 @@ export default function DashboardClient({
     setCenterFilter("all");
     setProductFilter("");
     setError("");
+    setMutationNotice("");
     setLoading(true);
     setSelectedSnapshotId(snapshotId);
   }
@@ -404,6 +442,7 @@ export default function DashboardClient({
     setCenterFilter("all");
     setProductFilter("");
     setError("");
+    setMutationNotice("");
     setLoading(true);
     setReloadToken((value) => value + 1);
   }
@@ -416,6 +455,85 @@ export default function DashboardClient({
   function selectProduct(productId: string) {
     logger.info("UI", "product_filter_selected", { productId });
     setProductFilter(productId);
+  }
+
+  async function saveOperationalUpdate(update: OperationalUpdate) {
+    const sourceSnapshotId = selectedSnapshotId;
+    logger.info("UI", "operational_update_started", {
+      operation: update.operation,
+      snapshotId: sourceSnapshotId,
+    });
+    setError("");
+    setMutationNotice("");
+    const result = await postApi<OperationalUpdateResult>(
+      `/api/snapshots/${encodeURIComponent(sourceSnapshotId)}/operations`,
+      update,
+    );
+    if (result.source_snapshot_id !== sourceSnapshotId) {
+      throw new ApiClientError(
+        409,
+        "SNAPSHOT_MISMATCH",
+        "La versión publicada no corresponde al snapshot editado.",
+      );
+    }
+    setSnapshots((current) =>
+      sortSnapshots([
+        result.snapshot,
+        ...current.filter((snapshot) => snapshot.id !== result.snapshot.id),
+      ]),
+    );
+    setBundle(null);
+    setLoading(true);
+    setSelectedSnapshotId(result.snapshot.id);
+    setMutationNotice(
+      "Guardado correctamente. Se creó y seleccionó una nueva versión operativa.",
+    );
+    logger.ok("UI", "operational_update_completed", {
+      operation: result.operation,
+      sourceSnapshotId,
+      snapshotId: result.snapshot.id,
+    });
+  }
+
+  async function saveMovement(update: MovementOperation) {
+    const sourceSnapshotId = selectedSnapshotId;
+    logger.info("UI", "movement_started", {
+      operation: update.operation,
+      snapshotId: sourceSnapshotId,
+    });
+    setError("");
+    setMutationNotice("");
+    const result = await postApi<MovementOperationResult>(
+      `/api/snapshots/${encodeURIComponent(sourceSnapshotId)}/movements`,
+      update,
+    );
+    if (result.source_snapshot_id !== sourceSnapshotId) {
+      throw new ApiClientError(
+        409,
+        "SNAPSHOT_MISMATCH",
+        "La versión publicada no corresponde al snapshot seleccionado.",
+      );
+    }
+    setSnapshots((current) =>
+      sortSnapshots([
+        result.snapshot,
+        ...current.filter((snapshot) => snapshot.id !== result.snapshot.id),
+      ]),
+    );
+    setBundle(null);
+    setLoading(true);
+    setSelectedSnapshotId(result.snapshot.id);
+    setMutationNotice(
+      result.idempotent
+        ? "La operación ya estaba registrada. Se seleccionó su versión operativa sin duplicar inventario."
+        : "Movimiento guardado. Se creó y seleccionó una nueva versión operativa.",
+    );
+    logger.ok("UI", "movement_completed", {
+      idempotent: result.idempotent,
+      operation: result.operation,
+      sourceSnapshotId,
+      snapshotId: result.snapshot.id,
+    });
   }
 
   function renderActivePanel() {
@@ -531,6 +649,17 @@ export default function DashboardClient({
             </tr>
           ))}
         </TableFrame>
+      );
+    }
+
+    if (activeTab === "movimientos") {
+      return (
+        <MovementEditor
+          bundle={bundle}
+          centerFilter={centerFilter}
+          key={`${bundle.snapshot.id}-${centerFilter}`}
+          onSave={saveMovement}
+        />
       );
     }
 
@@ -651,6 +780,10 @@ export default function DashboardClient({
           />
         ) : null}
 
+        {mutationNotice ? (
+          <DashboardStatus message={mutationNotice} tone="success" />
+        ) : null}
+
         {error ? (
           <DashboardStatus
             action={
@@ -695,6 +828,18 @@ export default function DashboardClient({
             id={`panel-${activeTab}`}
             role="tabpanel"
           >
+            {bundle &&
+            (activeTab === "centros" ||
+              activeTab === "inventario" ||
+              activeTab === "necesidades" ||
+              activeTab === "voluntarios") ? (
+              <AdministrativeEditor
+                activeTab={activeTab}
+                bundle={bundle}
+                key={`${bundle.snapshot.id}-${activeTab}`}
+                onSave={saveOperationalUpdate}
+              />
+            ) : null}
             {renderActivePanel()}
           </div>
         </section>

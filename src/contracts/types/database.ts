@@ -69,6 +69,23 @@ export interface ExpectedDonationRecord {
   estado: "pendiente" | "recibida" | "cancelada";
 }
 
+export interface MovementRecord {
+  snapshot_id: string;
+  movimiento_id: string;
+  operacion_id: string;
+  tipo: "recepcion_confirmada" | "despacho";
+  centro_origen_id: string | null;
+  centro_destino_id: string | null;
+  producto_id: string;
+  sku_id: string;
+  cantidad_paquetes: number;
+  ocurrido_en: string;
+  registrado_en: string;
+  intencion_id: string | null;
+  snapshot_origen_id: string;
+  cantidad_anunciada_paquetes: number | null;
+}
+
 export interface SimulationRecord {
   id: string;
   snapshot_id: string;

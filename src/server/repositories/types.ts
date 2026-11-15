@@ -3,6 +3,7 @@ import type {
   CenterRecord,
   ExpectedDonationRecord,
   InventoryRecord,
+  MovementRecord,
   NeedRecord,
   PresentationRecord,
   ProductRecord,
@@ -21,11 +22,13 @@ export interface DashboardSource {
   volunteers: VolunteerRecord[];
   travelTimes: TravelTimeRecord[];
   expectedDonations: ExpectedDonationRecord[];
+  movements: MovementRecord[];
 }
 
 export interface OperationsRepository {
   listSnapshots(): Promise<SnapshotRecord[]>;
   findSnapshot(snapshotId: string): Promise<SnapshotRecord | null>;
+  getSnapshotBundle(snapshotId: string): Promise<SnapshotBundle | null>;
   listCenters(snapshotId: string): Promise<CenterRecord[]>;
   listProducts(snapshotId: string): Promise<ProductRecord[]>;
   listPresentations(snapshotId: string): Promise<PresentationRecord[]>;
@@ -34,6 +37,7 @@ export interface OperationsRepository {
   listVolunteers(snapshotId: string): Promise<VolunteerRecord[]>;
   listTravelTimes(snapshotId: string): Promise<TravelTimeRecord[]>;
   listExpectedDonations(snapshotId: string): Promise<ExpectedDonationRecord[]>;
+  listMovements(snapshotId: string): Promise<MovementRecord[]>;
   getDashboardSource(snapshotId: string): Promise<DashboardSource>;
   writeSnapshot(input: unknown): Promise<SnapshotRecord>;
 }

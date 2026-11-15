@@ -257,6 +257,7 @@ const bundle: DashboardBundle = {
         estado: "pendiente",
       },
     ],
+    movimientos: [],
     candidatos_traslado: [],
   },
 };

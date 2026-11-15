@@ -3,7 +3,7 @@ export function DashboardStatus({
   message,
   action,
 }: {
-  tone: "loading" | "error" | "empty";
+  tone: "loading" | "error" | "empty" | "success";
   message: string;
   action?: { label: string; onClick: () => void };
 }) {
@@ -11,6 +11,7 @@ export function DashboardStatus({
     loading: "border-blue-200 bg-blue-50 text-blue-900",
     error: "border-red-200 bg-red-50 text-red-900",
     empty: "border-slate-200 bg-white text-slate-600",
+    success: "border-emerald-200 bg-emerald-50 text-emerald-900",
   }[tone];
 
   return (

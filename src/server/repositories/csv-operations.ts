@@ -189,6 +189,11 @@ export class CsvOperationsRepository implements OperationsRepository {
     return (await this.loadSnapshot(snapshotId))?.metadata ?? null;
   }
 
+  async getSnapshotBundle(snapshotId: string) {
+    const bundle = await this.loadSnapshot(snapshotId);
+    return bundle ? structuredClone(bundle) : null;
+  }
+
   async listCenters(snapshotId: string) {
     const rows = (await this.loadSnapshot(snapshotId))?.centers ?? [];
     return sortedBy(rows, (row) => row.centro_id);
@@ -229,6 +234,15 @@ export class CsvOperationsRepository implements OperationsRepository {
     return (await this.loadSnapshot(snapshotId))?.expectedDonations ?? [];
   }
 
+  async listMovements(snapshotId: string) {
+    const rows = (await this.loadSnapshot(snapshotId))?.movements ?? [];
+    return [...rows].sort(
+      (left, right) =>
+        right.ocurrido_en.localeCompare(left.ocurrido_en) ||
+        right.movimiento_id.localeCompare(left.movimiento_id),
+    );
+  }
+
   async getDashboardSource(snapshotId: string): Promise<DashboardSource> {
     const bundle = await this.loadSnapshot(snapshotId);
     if (!bundle) {
@@ -242,6 +256,7 @@ export class CsvOperationsRepository implements OperationsRepository {
         volunteers: [],
         travelTimes: [],
         expectedDonations: [],
+        movements: [],
       };
     }
 
@@ -259,6 +274,11 @@ export class CsvOperationsRepository implements OperationsRepository {
           left.destino_id.localeCompare(right.destino_id),
       ),
       expectedDonations: bundle.expectedDonations,
+      movements: [...bundle.movements].sort(
+        (left, right) =>
+          right.ocurrido_en.localeCompare(left.ocurrido_en) ||
+          right.movimiento_id.localeCompare(left.movimiento_id),
+      ),
     };
   }
 

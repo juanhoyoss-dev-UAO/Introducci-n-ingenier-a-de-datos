@@ -206,6 +206,7 @@ export async function getDashboard(
     indicadores,
     visualizaciones,
     donaciones_esperadas: source.expectedDonations,
+    movimientos: source.movements,
     candidatos_traslado: recommendTransfers(balances, source.travelTimes),
   };
   serverLog("OK", "SERVICE", "Indicadores calculados", {

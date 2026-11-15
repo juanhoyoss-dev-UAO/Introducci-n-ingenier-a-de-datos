@@ -1,5 +1,73 @@
 # Bitácora técnica
 
+## 2026-11-15 - Bloque M4
+
+### Objetivo
+
+Registrar recepciones y despachos con fecha/hora, sincronizando historial, inventario y donaciones dentro de versiones operativas inmutables e idempotentes.
+
+### Implementación
+
+- Añadido `movimientos.csv` compatible: su ausencia en snapshots previos equivale a historial vacío y las versiones M4 lo publican con el resto del bundle.
+- Añadidos contratos para recepción directa, confirmación de donación y despacho, con paquetes enteros positivos e ISO 8601 con offset.
+- Cada movimiento conserva UUID, operación idempotente, tipo, centros, producto, presentación, cantidades, `ocurrido_en`, `registrado_en`, snapshot fuente e intención opcional.
+- La confirmación conserva el anuncio original y cambia la intención a `recibida`; el despacho rechaza existencias insuficientes.
+- El UUID de operación produce una versión determinista y permite reintentos sin doble incremento.
+- Añadido `GET/POST /api/snapshots/[id]/movements`, protegido por sesión administrativa y validación de origen.
+- Añadida la pestaña administrativa con formularios, diferencia anunciada/recibida e historial filtrable.
+- Los traslados ejecutados se pospusieron; no se implementó simulador, alertas ni gráficos históricos.
+
+### Verificaciones reales
+
+- `npm.cmd run test:unit`: 6 archivos, 27/27.
+- `npm.cmd run test:csv`: 3 archivos, 34/34.
+- `npm.cmd run test:http`: 1 archivo, 19/19 tras ajustar a 10 s dos pruebas M3 con múltiples solicitudes secuenciales. La ejecución previa aprobó 17/19 y tuvo únicamente dos timeouts de 5 s.
+- `npm.cmd run lint`: aprobado.
+- `npm.cmd run typecheck`: aprobado.
+- `npm.cmd run build`: aprobado; 16 rutas/páginas.
+- Navegador: D01 confirmada con 10 paquetes; historial, versión seleccionada, inventario 18.000 ml, déficit 2.000 ml, cobertura 90 % y agregado pendiente actualizado; consola sin errores.
+
+### Pendientes
+
+- Traslados entre centros como movimiento ejecutado.
+- Agregados horarios y gráficos históricos para M5/M6.
+- El runtime aislado de QA fue eliminado; no se tocaron snapshots demostrativos.
+- No hacer commit, push ni merge sin autorización.
+
+## 2026-11-15 - Bloque M3
+
+### Objetivo
+
+Permitir actualizaciones operativas desde el dashboard administrativo sin sobrescribir snapshots ni ampliar el alcance hacia M4.
+
+### Implementación
+
+- Añadido un contrato Zod discriminado para centros, inventario, necesidades y voluntariado.
+- Añadido un servicio transaccional que clona la versión seleccionada, aplica una operación, valida el bundle y lo publica con UUID y metadatos nuevos mediante el repositorio CSV existente.
+- Añadido `POST /api/snapshots/[id]/operations` con sesión administrativa, validación de origen y errores normalizados.
+- Añadidos formularios en las secciones correspondientes, con estados de guardado, error y confirmación.
+- Tras una respuesta exitosa, el dashboard selecciona la versión nueva y recarga datos analíticos y tabulares conservando filtros todavía válidos.
+- La desactivación de centros preserva relaciones; una necesidad se cierra con objetivo cero; las donaciones anunciadas siguen separadas del inventario confirmado.
+- No se modificaron esquemas CSV, snapshots demostrativos, autenticación ni dependencias.
+
+### Verificaciones reales
+
+- `npm.cmd run test:unit`: 6 archivos, 27/27.
+- `npm.cmd run test:csv`: 3 archivos, 29/29.
+- `npm.cmd run test:http`: 1 archivo, 16/16 en repetición aislada. Una ejecución anterior tuvo cinco timeouts de 5 s y 11 pruebas aprobadas; no hubo aserciones funcionales fallidas.
+- `npm.cmd run lint`: aprobado.
+- `npm.cmd run typecheck`: aprobado.
+- `npm.cmd run build`: aprobado; 15 rutas/páginas, incluida la ruta de operaciones.
+- Navegador: publicación, selección automática, inventario actualizado y resumen visual comprobados en un runtime temporal; consola sin errores.
+- Caso C01/agua: la prueba cambia la presentación de 600 ml de 10 a 20 paquetes; la versión nueva consolida 18.000 ml confirmados, 20.000 ml requeridos, déficit de 2.000 ml y cobertura de 90 %, mientras el snapshot fuente conserva 12.000/20.000/8.000 y la donación esperada permanece separada.
+
+### Pendientes
+
+- No existe todavía historial de eventos independiente de snapshots ni edición masiva.
+- La ocupación continúa no calculable hasta contar con capacidad por centro y peso por presentación.
+- M4 no fue iniciado.
+- No hacer commit, push ni merge sin autorización.
+
 ## 2026-11-15 - Bloque M2
 
 ### Objetivo

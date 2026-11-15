@@ -37,6 +37,42 @@ export interface SnapshotRecord {
   descripcion: string | null;
 }
 
+export interface OperationalUpdateResult {
+  snapshot: SnapshotRecord;
+  source_snapshot_id: string;
+  operation:
+    | "create_center"
+    | "update_center"
+    | "upsert_inventory"
+    | "upsert_need"
+    | "upsert_volunteers";
+}
+
+export interface MovementRecord {
+  snapshot_id: string;
+  movimiento_id: string;
+  operacion_id: string;
+  tipo: "recepcion_confirmada" | "despacho";
+  centro_origen_id: string | null;
+  centro_destino_id: string | null;
+  producto_id: string;
+  sku_id: string;
+  cantidad_paquetes: number;
+  ocurrido_en: string;
+  registrado_en: string;
+  intencion_id: string | null;
+  snapshot_origen_id: string;
+  cantidad_anunciada_paquetes: number | null;
+}
+
+export interface MovementOperationResult {
+  snapshot: SnapshotRecord;
+  source_snapshot_id: string;
+  operation: "confirm_donation" | "direct_reception" | "dispatch";
+  movement: MovementRecord;
+  idempotent: boolean;
+}
+
 export interface CenterRecord {
   snapshot_id: string;
   centro_id: string;
@@ -117,6 +153,7 @@ export interface DashboardData {
   indicadores: DashboardIndicatorSummary;
   visualizaciones: DashboardVisualizations;
   donaciones_esperadas: ExpectedDonationRecord[];
+  movimientos: MovementRecord[];
   candidatos_traslado: unknown[];
 }
 
@@ -137,4 +174,5 @@ export type DashboardTab =
   | "necesidades"
   | "voluntarios"
   | "donaciones"
+  | "movimientos"
   | "tiempos";

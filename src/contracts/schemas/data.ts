@@ -126,6 +126,28 @@ export const expectedDonationCsvRowSchema = z
   })
   .strict();
 
+export const movementCsvRowSchema = z
+  .object({
+    snapshot_id: uuidSchema,
+    movimiento_id: uuidSchema,
+    operacion_id: uuidSchema,
+    tipo: z.enum(["recepcion_confirmada", "despacho"]),
+    centro_origen_id: nullableTextSchema,
+    centro_destino_id: nullableTextSchema,
+    producto_id: identifierSchema,
+    sku_id: identifierSchema,
+    cantidad_paquetes: positiveIntegerSchema,
+    ocurrido_en: timestampSchema,
+    registrado_en: timestampSchema,
+    intencion_id: nullableTextSchema,
+    snapshot_origen_id: uuidSchema,
+    cantidad_anunciada_paquetes: z.preprocess(
+      (value) => (typeof value === "string" && value.trim() === "" ? null : value),
+      positiveIntegerSchema.nullable(),
+    ),
+  })
+  .strict();
+
 const snapshotBundleBaseSchema = z
   .object({
     metadata: snapshotMetadataSchema,
@@ -137,6 +159,7 @@ const snapshotBundleBaseSchema = z
     volunteers: z.array(volunteerCsvRowSchema),
     travelTimes: z.array(travelTimeCsvRowSchema),
     expectedDonations: z.array(expectedDonationCsvRowSchema),
+    movements: z.array(movementCsvRowSchema),
   })
   .strict();
 
@@ -196,6 +219,7 @@ export const snapshotBundleSchema = snapshotBundleBaseSchema.superRefine(
       ["volunteers", bundle.volunteers],
       ["travelTimes", bundle.travelTimes],
       ["expectedDonations", bundle.expectedDonations],
+      ["movements", bundle.movements],
     ];
 
     for (const [collection, rows] of collections) {
@@ -264,6 +288,20 @@ export const snapshotBundleSchema = snapshotBundleBaseSchema.superRefine(
       (row) => row.intencion_id,
       "expectedDonations",
       "intención",
+      context,
+    );
+    reportDuplicate(
+      bundle.movements,
+      (row) => row.movimiento_id,
+      "movements",
+      "movimiento",
+      context,
+    );
+    reportDuplicate(
+      bundle.movements,
+      (row) => row.operacion_id,
+      "movements",
+      "operación de movimiento",
       context,
     );
 
@@ -368,6 +406,82 @@ export const snapshotBundleSchema = snapshotBundleBaseSchema.superRefine(
         context,
       );
     });
+
+    const intentionIds = new Set(
+      bundle.expectedDonations.map((row) => row.intencion_id),
+    );
+    bundle.movements.forEach((row, index) => {
+      reportMissingReference(
+        productIds.has(row.producto_id),
+        "movements",
+        index,
+        "producto_id",
+        `producto ${row.producto_id}`,
+        context,
+      );
+      reportMissingReference(
+        skuIds.has(row.sku_id),
+        "movements",
+        index,
+        "sku_id",
+        `SKU ${row.sku_id}`,
+        context,
+      );
+      if (row.centro_origen_id) {
+        reportMissingReference(
+          centerIds.has(row.centro_origen_id),
+          "movements",
+          index,
+          "centro_origen_id",
+          `centro de origen ${row.centro_origen_id}`,
+          context,
+        );
+      }
+      if (row.centro_destino_id) {
+        reportMissingReference(
+          centerIds.has(row.centro_destino_id),
+          "movements",
+          index,
+          "centro_destino_id",
+          `centro de destino ${row.centro_destino_id}`,
+          context,
+        );
+      }
+      if (row.intencion_id) {
+        reportMissingReference(
+          intentionIds.has(row.intencion_id),
+          "movements",
+          index,
+          "intencion_id",
+          `intención ${row.intencion_id}`,
+          context,
+        );
+      }
+      const presentation = bundle.presentations.find(
+        (item) => item.sku_id === row.sku_id,
+      );
+      if (presentation && presentation.producto_id !== row.producto_id) {
+        context.addIssue({
+          code: "custom",
+          path: ["movements", index, "producto_id"],
+          message: "El producto del movimiento no coincide con su presentación.",
+        });
+      }
+      const hasValidCenters =
+        (row.tipo === "recepcion_confirmada" &&
+          row.centro_origen_id === null &&
+          row.centro_destino_id !== null) ||
+        (row.tipo === "despacho" &&
+          row.centro_origen_id !== null &&
+          row.centro_destino_id === null);
+      if (!hasValidCenters) {
+        context.addIssue({
+          code: "custom",
+          path: ["movements", index, "tipo"],
+          message: "Los centros de origen y destino no corresponden al tipo de movimiento.",
+        });
+      }
+    });
   },
 );
 
@@ -386,4 +500,5 @@ export type TravelTimeCsvRow = z.infer<typeof travelTimeCsvRowSchema>;
 export type ExpectedDonationCsvRow = z.infer<
   typeof expectedDonationCsvRowSchema
 >;
+export type MovementCsvRow = z.infer<typeof movementCsvRowSchema>;
 export type SnapshotBundle = z.infer<typeof snapshotBundleSchema>;

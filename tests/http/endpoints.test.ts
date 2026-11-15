@@ -30,6 +30,32 @@ interface SnapshotResponse {
   id: string;
 }
 
+interface OperationalUpdateResponse {
+  snapshot: SnapshotResponse;
+  source_snapshot_id: string;
+  operation: string;
+}
+
+interface MovementResponse {
+  snapshot: SnapshotResponse;
+  source_snapshot_id: string;
+  operation: string;
+  idempotent: boolean;
+  movement: {
+    operacion_id: string;
+    tipo: "recepcion_confirmada" | "despacho";
+    centro_origen_id: string | null;
+    centro_destino_id: string | null;
+    producto_id: string;
+    sku_id: string;
+    cantidad_paquetes: number;
+    ocurrido_en: string;
+    registrado_en: string;
+    intencion_id: string | null;
+    cantidad_anunciada_paquetes: number | null;
+  };
+}
+
 interface ProductResponse {
   producto_id: string;
   nombre: string;
@@ -657,6 +683,328 @@ describe("HTTP real C2", () => {
     expect(waterInventory(snapshotA.body)).toBe(12_000);
     expect(waterInventory(snapshotB.body)).toBe(2_700);
   });
+
+  it("M3 publica inventario por API y actualiza las visualizaciones", async () => {
+    const update = await api<ApiSuccess<OperationalUpdateResponse>>(
+      `/api/snapshots/${SNAPSHOT_A}/operations`,
+      {
+        method: "POST",
+        origin: baseUrl,
+        cookie: administratorCookie,
+        body: {
+          operation: "upsert_inventory",
+          values: {
+            centro_id: "C01",
+            producto_id: "P01",
+            sku_id: "AGUA-600",
+            cantidad_paquetes: 20,
+          },
+        },
+      },
+    );
+    expect(update.response.status, JSON.stringify(update.body)).toBe(200);
+    expect(update.body.data).toMatchObject({
+      source_snapshot_id: SNAPSHOT_A,
+      operation: "upsert_inventory",
+    });
+    const operationalId = update.body.data.snapshot.id;
+    expect(operationalId).not.toBe(SNAPSHOT_A);
+
+    const [original, operational] = await Promise.all([
+      api<ApiSuccess<DashboardResponse>>(
+        `/api/dashboard?snapshotId=${SNAPSHOT_A}`,
+        { cookie: administratorCookie },
+      ),
+      api<ApiSuccess<DashboardResponse>>(
+        `/api/dashboard?snapshotId=${operationalId}`,
+        { cookie: administratorCookie },
+      ),
+    ]);
+    const water = (body: ApiSuccess<DashboardResponse>) =>
+      body.data.centros
+        .find((center) => center.centro_id === "C01")
+        ?.productos.find((product) => product.producto_id === "P01");
+    expect(water(original.body)).toMatchObject({
+      inventario_confirmado_unidad_base: 12_000,
+      deficit_confirmado_unidad_base: 8_000,
+    });
+    expect(water(operational.body)).toMatchObject({
+      inventario_confirmado_unidad_base: 18_000,
+      deficit_confirmado_unidad_base: 2_000,
+      cobertura_porcentaje: 90,
+    });
+    expect(
+      operational.body.data.visualizaciones.inventario_vs_necesidad,
+    ).toContainEqual(
+      expect.objectContaining({
+        centro_id: "C01",
+        producto_id: "P01",
+        inventario_confirmado: 18_000,
+      }),
+    );
+  }, 10_000);
+
+  it("M3 protege y valida las operaciones de escritura", async () => {
+    const anonymous = await api<ApiFailure>(
+      `/api/snapshots/${SNAPSHOT_A}/operations`,
+      {
+        method: "POST",
+        origin: baseUrl,
+        body: {
+          operation: "upsert_volunteers",
+          values: { centro_id: "C01", disponibles: 1, requeridos: 2 },
+        },
+      },
+    );
+    const foreignOrigin = await api<ApiFailure>(
+      `/api/snapshots/${SNAPSHOT_A}/operations`,
+      {
+        method: "POST",
+        origin: "https://example.invalid",
+        cookie: administratorCookie,
+        body: {
+          operation: "upsert_volunteers",
+          values: { centro_id: "C01", disponibles: 1, requeridos: 2 },
+        },
+      },
+    );
+    const negative = await api<ApiFailure>(
+      `/api/snapshots/${SNAPSHOT_A}/operations`,
+      {
+        method: "POST",
+        origin: baseUrl,
+        cookie: administratorCookie,
+        body: {
+          operation: "upsert_inventory",
+          values: {
+            centro_id: "C01",
+            producto_id: "P01",
+            sku_id: "AGUA-600",
+            cantidad_paquetes: -1,
+          },
+        },
+      },
+    );
+    const missingReference = await api<ApiFailure>(
+      `/api/snapshots/${SNAPSHOT_A}/operations`,
+      {
+        method: "POST",
+        origin: baseUrl,
+        cookie: administratorCookie,
+        body: {
+          operation: "upsert_need",
+          values: {
+            centro_id: "C01",
+            producto_id: "P99",
+            objetivo_unidad_base: 10,
+            prioridad: 1,
+          },
+        },
+      },
+    );
+
+    expect(anonymous.response.status).toBe(401);
+    expect(anonymous.body.error.code).toBe("UNAUTHENTICATED");
+    expect(foreignOrigin.response.status).toBe(403);
+    expect(foreignOrigin.body.error.code).toBe("INVALID_ORIGIN");
+    expect(negative.response.status).toBe(400);
+    expect(negative.body.error.code).toBe("INVALID_OPERATION");
+    expect(missingReference.response.status).toBe(400);
+    expect(missingReference.body.error.code).toBe("INVALID_REFERENCE");
+  }, 10_000);
+
+  it("M4 confirma una donación por API, conserva el anuncio y es idempotente", async () => {
+    const payload = {
+      operation: "confirm_donation",
+      values: {
+        operacion_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1",
+        intencion_id: "D01",
+        cantidad_paquetes: 10,
+        ocurrido_en: "2026-11-15T11:00:00-05:00",
+      },
+    };
+    const first = await api<ApiSuccess<MovementResponse>>(
+      `/api/snapshots/${SNAPSHOT_A}/movements`,
+      {
+        method: "POST",
+        origin: baseUrl,
+        cookie: administratorCookie,
+        body: payload,
+      },
+    );
+    const repeated = await api<ApiSuccess<MovementResponse>>(
+      `/api/snapshots/${SNAPSHOT_A}/movements`,
+      {
+        method: "POST",
+        origin: baseUrl,
+        cookie: administratorCookie,
+        body: payload,
+      },
+    );
+    expect(first.response.status, JSON.stringify(first.body)).toBe(200);
+    expect(repeated.response.status, JSON.stringify(repeated.body)).toBe(200);
+    expect(first.body.data.idempotent).toBe(false);
+    expect(repeated.body.data.idempotent).toBe(true);
+    expect(repeated.body.data.snapshot.id).toBe(first.body.data.snapshot.id);
+    expect(first.body.data.movement).toMatchObject({
+      intencion_id: "D01",
+      cantidad_paquetes: 10,
+      cantidad_anunciada_paquetes: 10,
+      ocurrido_en: "2026-11-15T11:00:00-05:00",
+    });
+
+    const operationalId = first.body.data.snapshot.id;
+    const [original, operational, history] = await Promise.all([
+      api<ApiSuccess<DashboardResponse>>(
+        `/api/dashboard?snapshotId=${SNAPSHOT_A}`,
+        { cookie: administratorCookie },
+      ),
+      api<ApiSuccess<DashboardResponse>>(
+        `/api/dashboard?snapshotId=${operationalId}`,
+        { cookie: administratorCookie },
+      ),
+      api<ApiSuccess<MovementResponse["movement"][]>>(
+        `/api/snapshots/${operationalId}/movements?centroId=C01&desde=${encodeURIComponent("2026-11-15T10:00:00-05:00")}&hasta=${encodeURIComponent("2026-11-15T12:00:00-05:00")}`,
+        { cookie: administratorCookie },
+      ),
+    ]);
+    const water = (body: ApiSuccess<DashboardResponse>) =>
+      body.data.centros
+        .find((center) => center.centro_id === "C01")
+        ?.productos.find((product) => product.producto_id === "P01");
+    expect(water(original.body)).toMatchObject({
+      inventario_confirmado_unidad_base: 12_000,
+      deficit_confirmado_unidad_base: 8_000,
+      donaciones_esperadas_unidad_base: 6_000,
+    });
+    expect(water(operational.body)).toMatchObject({
+      inventario_confirmado_unidad_base: 18_000,
+      deficit_confirmado_unidad_base: 2_000,
+      donaciones_esperadas_unidad_base: 0,
+    });
+    expect(history.response.status).toBe(200);
+    expect(history.body.data).toHaveLength(1);
+  }, 10_000);
+
+  it("M4 registra recepción directa y despacho en versiones sucesivas", async () => {
+    const reception = await api<ApiSuccess<MovementResponse>>(
+      `/api/snapshots/${SNAPSHOT_A}/movements`,
+      {
+        method: "POST",
+        origin: baseUrl,
+        cookie: administratorCookie,
+        body: {
+          operation: "direct_reception",
+          values: {
+            operacion_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2",
+            centro_id: "C01",
+            producto_id: "P01",
+            sku_id: "AGUA-600",
+            cantidad_paquetes: 5,
+            ocurrido_en: "2026-11-15T12:00:00-05:00",
+          },
+        },
+      },
+    );
+    expect(reception.response.status, JSON.stringify(reception.body)).toBe(200);
+    const dispatch = await api<ApiSuccess<MovementResponse>>(
+      `/api/snapshots/${reception.body.data.snapshot.id}/movements`,
+      {
+        method: "POST",
+        origin: baseUrl,
+        cookie: administratorCookie,
+        body: {
+          operation: "dispatch",
+          values: {
+            operacion_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb3",
+            centro_id: "C01",
+            producto_id: "P01",
+            sku_id: "AGUA-600",
+            cantidad_paquetes: 3,
+            ocurrido_en: "2026-11-15T13:00:00-05:00",
+          },
+        },
+      },
+    );
+    expect(dispatch.response.status, JSON.stringify(dispatch.body)).toBe(200);
+    const [dashboard, history] = await Promise.all([
+      api<ApiSuccess<DashboardResponse>>(
+        `/api/dashboard?snapshotId=${dispatch.body.data.snapshot.id}`,
+        { cookie: administratorCookie },
+      ),
+      api<ApiSuccess<MovementResponse["movement"][]>>(
+        `/api/snapshots/${dispatch.body.data.snapshot.id}/movements`,
+        { cookie: administratorCookie },
+      ),
+    ]);
+    const water = dashboard.body.data.centros
+      .find((center) => center.centro_id === "C01")
+      ?.productos.find((product) => product.producto_id === "P01");
+    expect(water?.existencias).toContainEqual(
+      expect.objectContaining({ sku_id: "AGUA-600", cantidad_paquetes: 12 }),
+    );
+    expect(history.body.data).toHaveLength(2);
+    expect(history.body.data.map((row) => row.tipo)).toEqual([
+      "despacho",
+      "recepcion_confirmada",
+    ]);
+  }, 10_000);
+
+  it("M4 protege, valida y evita despachos por encima del inventario", async () => {
+    const path = `/api/snapshots/${SNAPSHOT_A}/movements`;
+    const anonymous = await api<ApiFailure>(path, {
+      method: "POST",
+      origin: baseUrl,
+      body: {
+        operation: "direct_reception",
+        values: {
+          operacion_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb4",
+          centro_id: "C01",
+          producto_id: "P01",
+          sku_id: "AGUA-600",
+          cantidad_paquetes: 1,
+          ocurrido_en: "2026-11-15T14:00:00-05:00",
+        },
+      },
+    });
+    const fractional = await api<ApiFailure>(path, {
+      method: "POST",
+      origin: baseUrl,
+      cookie: administratorCookie,
+      body: {
+        operation: "direct_reception",
+        values: {
+          operacion_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb5",
+          centro_id: "C01",
+          producto_id: "P01",
+          sku_id: "AGUA-600",
+          cantidad_paquetes: 1.5,
+          ocurrido_en: "2026-11-15T14:00:00-05:00",
+        },
+      },
+    });
+    const insufficient = await api<ApiFailure>(path, {
+      method: "POST",
+      origin: baseUrl,
+      cookie: administratorCookie,
+      body: {
+        operation: "dispatch",
+        values: {
+          operacion_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb6",
+          centro_id: "C01",
+          producto_id: "P01",
+          sku_id: "AGUA-600",
+          cantidad_paquetes: 11,
+          ocurrido_en: "2026-11-15T14:00:00-05:00",
+        },
+      },
+    });
+    expect(anonymous.response.status).toBe(401);
+    expect(fractional.response.status).toBe(400);
+    expect(fractional.body.error.code).toBe("INVALID_MOVEMENT_OPERATION");
+    expect(insufficient.response.status).toBe(409);
+    expect(insufficient.body.error.code).toBe("INSUFFICIENT_INVENTORY");
+  }, 10_000);
 
   it("T09 rechaza alteración, firma o secreto incorrectos y expiración", async () => {
     const token = administratorCookie.slice(

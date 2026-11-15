@@ -42,6 +42,16 @@ La recomendación es informativa. No representa vehículo, ruta real, capacidad 
 
 El evento conserva `ocurrido_en` y `registrado_en` para distinguir el hecho físico de su registro. No existe endpoint para crear o avanzar eventos en este bloque.
 
+## Movimientos operativos M4
+
+- Una recepción incrementa paquetes exactamente una vez y un despacho los disminuye sin permitir inventario negativo.
+- Inventario, intención y movimiento se publican en una misma versión operativa; no se guarda un movimiento si falla la publicación completa.
+- `operacion_id` es una clave idempotente global. Repetir la misma solicitud recupera su versión; reutilizarla con otros datos produce conflicto.
+- Una donación confirmada conserva su cantidad anunciada, registra la recibida y cambia a `recibida`, por lo que deja de formar parte del agregado pendiente.
+- `ocurrido_en` representa el hecho físico y `registrado_en` el momento del registro. Ambos usan ISO 8601 con zona explícita; la interfaz interpreta la jornada en `America/Bogota`.
+- Los movimientos se ordenan por `ocurrido_en` y UUID. Conteo de movimientos y suma de paquetes son métricas distintas.
+- Los traslados ejecutados todavía no están habilitados; las recomendaciones existentes continúan siendo informativas.
+
 ## Datos obligatorios de referencia
 
 En el snapshot A, `C01` tiene 10 botellas de 600 ml y 4 de 1.500 ml: 12.000 ml confirmados. Su objetivo es 20.000 ml, por lo que el déficit confirmado es 8.000 ml. La intención pendiente de 10 botellas de 600 ml equivale a 6.000 ml esperados y no reduce ese déficit confirmado.
