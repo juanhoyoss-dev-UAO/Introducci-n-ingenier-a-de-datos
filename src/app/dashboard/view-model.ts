@@ -1,4 +1,10 @@
 import type {
+  ConfirmedExpectedPoint,
+  CoverageByCenterPoint,
+  InventoryNeedPoint,
+  VolunteerComparisonPoint,
+} from "@/contracts/types/analytics";
+import type {
   CenterFilter,
   CenterRecord,
   DashboardBundle,
@@ -16,6 +22,31 @@ export interface DashboardSummary {
   centrosConNecesidades: number;
   centrosConDeficit: number;
   donacionesAnunciadas: number;
+}
+
+export interface OperationalAttention {
+  centro_id: string;
+  centro_nombre: string;
+  productosConDeficit: number;
+  voluntariosFaltantes: number;
+}
+
+export interface OperationalSummary {
+  centrosActivos: number;
+  centrosConDeficit: number;
+  productos: number;
+  centrosConNecesidades: number;
+  donacionesPendientes: number;
+  centrosConVoluntariosFaltantes: number;
+  atencion: OperationalAttention | null;
+}
+
+export interface InventoryComparisonRow extends InventoryNeedPoint {
+  deficit_confirmado: number | null;
+}
+
+export interface VolunteerComparisonRow extends VolunteerComparisonPoint {
+  faltantes: number;
 }
 
 export interface InventoryTableRow {
@@ -104,6 +135,130 @@ export function deriveSummary(bundle: DashboardBundle): DashboardSummary {
     ).length,
     donacionesAnunciadas: bundle.dashboard.donaciones_esperadas.length,
   };
+}
+
+export function deriveOperationalSummary(
+  bundle: DashboardBundle,
+  filter: CenterFilter,
+): OperationalSummary {
+  const centers = bundle.dashboard.centros.filter((center) =>
+    matchesCenter(center.centro_id, filter),
+  );
+  const attention = centers
+    .map((center) => ({
+      centro_id: center.centro_id,
+      centro_nombre: center.nombre,
+      productosConDeficit: center.productos.filter(
+        (product) => product.deficit_confirmado_unidad_base > 0,
+      ).length,
+      voluntariosFaltantes: center.voluntarios.faltantes,
+    }))
+    .filter(
+      (center) =>
+        center.productosConDeficit > 0 || center.voluntariosFaltantes > 0,
+    )
+    .sort(
+      (left, right) =>
+        right.productosConDeficit - left.productosConDeficit ||
+        right.voluntariosFaltantes - left.voluntariosFaltantes ||
+        left.centro_id.localeCompare(right.centro_id),
+    )[0] ?? null;
+
+  return {
+    centrosActivos:
+      filter === "all"
+        ? bundle.dashboard.indicadores.centros_activos
+        : centers.filter(
+            (center) => center.estado.trim().toLowerCase() === "activo",
+          ).length,
+    centrosConDeficit: centers.filter((center) =>
+      center.productos.some(
+        (product) => product.deficit_confirmado_unidad_base > 0,
+      ),
+    ).length,
+    productos: bundle.products.length,
+    centrosConNecesidades: centers.filter((center) =>
+      center.productos.some((product) => product.objetivo_unidad_base > 0),
+    ).length,
+    donacionesPendientes: bundle.dashboard.donaciones_esperadas.filter(
+      (donation) =>
+        donation.estado === "pendiente" &&
+        matchesCenter(donation.centro_id, filter),
+    ).length,
+    centrosConVoluntariosFaltantes: centers.filter(
+      (center) => center.voluntarios.faltantes > 0,
+    ).length,
+    atencion: attention,
+  };
+}
+
+export function coverageChartRows(
+  bundle: DashboardBundle,
+  filter: CenterFilter,
+  productId: string,
+): CoverageByCenterPoint[] {
+  return bundle.dashboard.visualizaciones.cobertura_por_centro.filter(
+    (row) =>
+      row.producto_id === productId && matchesCenter(row.centro_id, filter),
+  );
+}
+
+export function inventoryComparisonRows(
+  bundle: DashboardBundle,
+  filter: CenterFilter,
+  productId: string,
+): InventoryComparisonRow[] {
+  const deficitByCenter = new Map(
+    bundle.dashboard.centros.flatMap((center) =>
+      center.productos.map(
+        (product) =>
+          [
+            `${center.centro_id}\u0000${product.producto_id}`,
+            product.deficit_confirmado_unidad_base,
+          ] as const,
+      ),
+    ),
+  );
+
+  return bundle.dashboard.visualizaciones.inventario_vs_necesidad
+    .filter(
+      (row) =>
+        row.producto_id === productId && matchesCenter(row.centro_id, filter),
+    )
+    .map((row) => ({
+      ...row,
+      deficit_confirmado:
+        deficitByCenter.get(`${row.centro_id}\u0000${row.producto_id}`) ?? null,
+    }));
+}
+
+export function resourceComparisonRows(
+  bundle: DashboardBundle,
+  filter: CenterFilter,
+  productId: string,
+): ConfirmedExpectedPoint[] {
+  return bundle.dashboard.visualizaciones.recursos_confirmados_vs_esperados.filter(
+    (row) =>
+      row.producto_id === productId && matchesCenter(row.centro_id, filter),
+  );
+}
+
+export function volunteerComparisonRows(
+  bundle: DashboardBundle,
+  filter: CenterFilter,
+): VolunteerComparisonRow[] {
+  const missingByCenter = new Map(
+    bundle.dashboard.centros.map(
+      (center) => [center.centro_id, center.voluntarios.faltantes] as const,
+    ),
+  );
+
+  return bundle.dashboard.visualizaciones.voluntarios_disponibles_vs_requeridos
+    .filter((row) => matchesCenter(row.centro_id, filter))
+    .map((row) => ({
+      ...row,
+      faltantes: missingByCenter.get(row.centro_id) ?? 0,
+    }));
 }
 
 export function centerRows(

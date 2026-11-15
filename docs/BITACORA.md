@@ -1,5 +1,68 @@
 # Bitácora técnica
 
+## 2026-11-15 - Bloque M2
+
+### Objetivo
+
+Construir el primer dashboard analítico y visual sobre los contratos de M1, manteniendo las tablas existentes y sin introducir simulaciones, importación Excel ni cambios de persistencia.
+
+### Implementación
+
+- Añadido un resumen operativo inicial con seis indicadores y una señal de atención basada en el número de productos con déficit.
+- Añadidos gráficos accesibles y responsivos para cobertura, inventario frente a necesidad, recursos confirmados frente a esperados y voluntarios disponibles frente a requeridos.
+- Añadidos filtros coordinados por snapshot, centro y producto; los filtros dependientes se reinician al cambiar de snapshot.
+- Los valores no calculables, porcentajes superiores a 100 % y unidades de producto se preservan explícitamente.
+- Las transformaciones de presentación se mantuvieron en el modelo de vista y los gráficos se dividieron en componentes reutilizables, sin dependencias nuevas.
+- Se conservaron las seis tablas originales y los dos snapshots demostrativos.
+
+### Verificaciones reales
+
+- `npm.cmd run test:unit`: 6 archivos, 27/27.
+- `npm.cmd run test:csv`: 3 archivos, 25/25.
+- `npm.cmd run test:http`: 1 archivo, 14/14.
+- `npm.cmd run lint`: aprobado.
+- `npm.cmd run typecheck`: aprobado.
+- `npm.cmd run build`: aprobado; 13 rutas/páginas.
+- Navegador: snapshots A y B, filtros, tabla de inventario y diseño responsivo comprobados; consola sin errores.
+- Referencia C01 en snapshot A: 12.000 ml confirmados, 20.000 ml requeridos, déficit de 8.000 ml y 6.000 ml anunciados separados.
+
+### Pendientes
+
+- El catálogo experimental basado en Excel y la ocupación calculable siguen condicionados a recibir datos reales.
+- M3, simulaciones e importación desde interfaz no se iniciaron.
+- No hacer commit, push ni merge sin autorización.
+
+## 2026-11-15 - Bloque M1
+
+### Objetivo
+
+Ampliar los indicadores del dashboard, preparar contratos de datos para cuatro visualizaciones y dejar listo el cálculo de capacidad sin alterar la persistencia CSV.
+
+### Implementación
+
+- Añadidas fórmulas de cobertura, déficit potencial y ocupación en dominio.
+- El dashboard expone centros activos, métricas por centro/producto, voluntariado y colecciones tipadas para visualizaciones.
+- La capacidad actual se informa como no calculable con datos faltantes explícitos.
+- Se preservaron inventario confirmado, donaciones esperadas e independencia entre snapshots.
+- Se documentó la migración protegida necesaria para capacidad y peso.
+- El Excel de referencia no estaba disponible; no se creó un catálogo experimental.
+
+### Verificaciones reales
+
+- `npm.cmd run test:unit`: 6 archivos, 25/25.
+- `npm.cmd run test:csv`: 3 archivos, 25/25.
+- `npm.cmd run test:http`: 1 archivo, 14/14.
+- `npm.cmd run lint`: aprobado.
+- `npm.cmd run typecheck`: aprobado.
+- `npm.cmd run build`: aprobado; 13 rutas/páginas.
+
+### Pendientes
+
+- Recibir y perfilar el Excel de referencia en modo lectura.
+- Aprobar y ejecutar la migración de capacidad/peso antes de calcular ocupación real.
+- Construir gráficos en M2 usando los contratos ya expuestos.
+- No hacer commit, push ni merge sin autorización.
+
 ## 2026-10-24 - Bloque E0
 
 ### Objetivo

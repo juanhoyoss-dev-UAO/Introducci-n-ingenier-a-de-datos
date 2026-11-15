@@ -50,6 +50,8 @@ interface DashboardResponse {
       inventario_confirmado_unidad_base: number;
       objetivo_unidad_base: number;
       deficit_confirmado_unidad_base: number;
+      cobertura_porcentaje: number | null;
+      deficit_potencial_unidad_base: number;
       donaciones_esperadas_unidad_base: number;
       existencias: Array<{
         sku_id: string;
@@ -57,7 +59,42 @@ interface DashboardResponse {
         contenido_por_paquete: number;
       }>;
     }>;
+    capacidad_almacenamiento: {
+      calculable: boolean;
+      ocupacion_porcentaje: number | null;
+      sobrecapacidad: boolean | null;
+      datos_faltantes: string[];
+    };
   }>;
+  indicadores: { centros_activos: number };
+  visualizaciones: {
+    cobertura_por_centro: Array<{
+      centro_id: string;
+      producto_id: string;
+      cobertura_porcentaje: number | null;
+      unidad: string;
+    }>;
+    inventario_vs_necesidad: Array<{
+      centro_id: string;
+      producto_id: string;
+      inventario_confirmado: number;
+      necesidad_vigente: number;
+      unidad: string;
+    }>;
+    recursos_confirmados_vs_esperados: Array<{
+      centro_id: string;
+      producto_id: string;
+      recursos_confirmados: number;
+      recursos_esperados: number;
+      unidad: string;
+    }>;
+    voluntarios_disponibles_vs_requeridos: Array<{
+      centro_id: string;
+      disponibles: number;
+      requeridos: number;
+      unidad: string;
+    }>;
+  };
   donaciones_esperadas: Array<{
     intencion_id: string;
     centro_id: string;
@@ -475,8 +512,39 @@ describe("HTTP real C2", () => {
       inventario_confirmado_unidad_base: 12_000,
       objetivo_unidad_base: 20_000,
       deficit_confirmado_unidad_base: 8_000,
+      cobertura_porcentaje: 60,
+      deficit_potencial_unidad_base: 2_000,
       donaciones_esperadas_unidad_base: 6_000,
     });
+    expect(dashboard.body.data.indicadores.centros_activos).toBe(6);
+    expect(
+      dashboard.body.data.centros.find((center) => center.centro_id === "C01")
+        ?.capacidad_almacenamiento,
+    ).toMatchObject({
+      calculable: false,
+      ocupacion_porcentaje: null,
+      sobrecapacidad: null,
+    });
+    expect(
+      dashboard.body.data.visualizaciones.cobertura_por_centro,
+    ).toContainEqual(
+      expect.objectContaining({
+        centro_id: "C01",
+        producto_id: "P01",
+        cobertura_porcentaje: 60,
+        unidad: "porcentaje",
+      }),
+    );
+    expect(
+      dashboard.body.data.visualizaciones.voluntarios_disponibles_vs_requeridos,
+    ).toContainEqual(
+      expect.objectContaining({
+        centro_id: "C01",
+        disponibles: 4,
+        requeridos: 7,
+        unidad: "persona",
+      }),
+    );
     expect(water?.existencias).toHaveLength(2);
     expect(water?.existencias).toEqual(
       expect.arrayContaining([

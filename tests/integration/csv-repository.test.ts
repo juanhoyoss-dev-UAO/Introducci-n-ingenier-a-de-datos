@@ -162,6 +162,45 @@ describe("repositorio CSV", () => {
         inventario_confirmado_unidad_base: 12000,
         donaciones_esperadas_unidad_base: 6000,
         deficit_confirmado_unidad_base: 8000,
+        deficit_potencial_unidad_base: 2000,
+        cobertura_porcentaje: 60,
+      });
+      expect(dashboard.indicadores.centros_activos).toBe(6);
+      expect(center?.capacidad_almacenamiento).toMatchObject({
+        calculable: false,
+        ocupacion_porcentaje: null,
+        sobrecapacidad: null,
+      });
+      expect(
+        dashboard.visualizaciones.inventario_vs_necesidad,
+      ).toContainEqual(
+        expect.objectContaining({
+          centro_id: "C01",
+          producto_id: "P01",
+          inventario_confirmado: 12000,
+          necesidad_vigente: 20000,
+          unidad: "ml",
+        }),
+      );
+      expect(
+        dashboard.visualizaciones.recursos_confirmados_vs_esperados,
+      ).toContainEqual(
+        expect.objectContaining({
+          centro_id: "C01",
+          producto_id: "P01",
+          recursos_confirmados: 12000,
+          recursos_esperados: 6000,
+          unidad: "ml",
+        }),
+      );
+      expect(
+        dashboard.visualizaciones.voluntarios_disponibles_vs_requeridos,
+      ).toContainEqual({
+        centro_id: "C01",
+        centro_nombre: "Centro Norte",
+        disponibles: 4,
+        requeridos: 7,
+        unidad: "persona",
       });
       expect(dashboard.candidatos_traslado).toContainEqual(
         expect.objectContaining({

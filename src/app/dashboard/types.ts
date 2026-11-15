@@ -1,3 +1,9 @@
+import type {
+  DashboardIndicatorSummary,
+  DashboardVisualizations,
+  StorageCapacityIndicator,
+} from "@/contracts/types/analytics";
+
 export interface ApiSuccess<T> {
   data: T;
   meta: Record<string, unknown>;
@@ -78,6 +84,8 @@ export interface DashboardProduct {
   reserva_unidad_base: number;
   prioridad: number | null;
   deficit_confirmado_unidad_base: number;
+  cobertura_porcentaje: number | null;
+  deficit_potencial_unidad_base: number;
   excedente_transferible_unidad_base: number;
   donaciones_esperadas_unidad_base: number;
   existencias: DashboardStockLine[];
@@ -89,6 +97,7 @@ export interface DashboardCenter extends CenterRecord {
     requeridos: number;
     faltantes: number;
   };
+  capacidad_almacenamiento: StorageCapacityIndicator;
   productos: DashboardProduct[];
 }
 
@@ -105,6 +114,8 @@ export interface ExpectedDonationRecord {
 export interface DashboardData {
   snapshot: SnapshotRecord;
   centros: DashboardCenter[];
+  indicadores: DashboardIndicatorSummary;
+  visualizaciones: DashboardVisualizations;
   donaciones_esperadas: ExpectedDonationRecord[];
   candidatos_traslado: unknown[];
 }
@@ -120,6 +131,7 @@ export interface DashboardBundle {
 export type CenterFilter = "all" | string;
 
 export type DashboardTab =
+  | "resumen"
   | "centros"
   | "inventario"
   | "necesidades"

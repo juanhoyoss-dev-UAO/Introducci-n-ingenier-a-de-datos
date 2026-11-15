@@ -1,7 +1,14 @@
+import type {
+  DashboardIndicatorSummary,
+  DashboardVisualizations,
+} from "@/contracts/types/analytics";
 import {
+  calculateCoveragePercentage,
   calculateDeficit,
   calculateMissingVolunteers,
   calculatePackageUnits,
+  calculatePotentialDeficit,
+  calculateStorageOccupancy,
   calculateTransferableSurplus,
 } from "@/domain/inventory";
 import {
@@ -79,6 +86,7 @@ export async function getDashboard(
       const targetUnits = need?.objetivo_unidad_base ?? 0;
       const reserveUnits = need?.reserva_unidad_base ?? 0;
       const deficitUnits = calculateDeficit(confirmedUnits, targetUnits);
+      const expectedUnits = calculatePackageUnits(expectedLines);
       const surplusUnits = calculateTransferableSurplus(
         confirmedUnits,
         targetUnits,
@@ -102,12 +110,27 @@ export async function getDashboard(
         reserva_unidad_base: reserveUnits,
         prioridad: need?.prioridad ?? null,
         deficit_confirmado_unidad_base: deficitUnits,
+        cobertura_porcentaje: calculateCoveragePercentage(
+          confirmedUnits,
+          targetUnits,
+        ),
+        deficit_potencial_unidad_base: calculatePotentialDeficit(
+          confirmedUnits,
+          targetUnits,
+          expectedUnits,
+        ),
         excedente_transferible_unidad_base: surplusUnits,
-        donaciones_esperadas_unidad_base:
-          calculatePackageUnits(expectedLines),
+        donaciones_esperadas_unidad_base: expectedUnits,
         existencias: stock,
       };
     });
+
+    const centerInventory = source.inventory
+      .filter((row) => row.centro_id === center.centro_id)
+      .map((row) => ({
+        cantidad_paquetes: row.cantidad_paquetes,
+        peso_kg_por_paquete: null,
+      }));
 
     return {
       ...center,
@@ -119,13 +142,69 @@ export async function getDashboard(
           volunteer?.requeridos ?? 0,
         ),
       },
+      capacidad_almacenamiento: calculateStorageOccupancy(
+        centerInventory,
+        null,
+      ),
       productos: products,
     };
   });
 
+  const indicadores: DashboardIndicatorSummary = {
+    centros_activos: centers.filter(
+      (center) => center.estado.trim().toLowerCase() === "activo",
+    ).length,
+  };
+  const visualizaciones: DashboardVisualizations = {
+    cobertura_por_centro: centers.flatMap((center) =>
+      center.productos.map((product) => ({
+        centro_id: center.centro_id,
+        centro_nombre: center.nombre,
+        producto_id: product.producto_id,
+        producto_nombre: product.nombre,
+        cobertura_porcentaje: product.cobertura_porcentaje,
+        unidad: "porcentaje",
+        unidad_base_producto: product.unidad_base,
+      })),
+    ),
+    inventario_vs_necesidad: centers.flatMap((center) =>
+      center.productos.map((product) => ({
+        centro_id: center.centro_id,
+        centro_nombre: center.nombre,
+        producto_id: product.producto_id,
+        producto_nombre: product.nombre,
+        inventario_confirmado:
+          product.inventario_confirmado_unidad_base,
+        necesidad_vigente: product.objetivo_unidad_base,
+        unidad: product.unidad_base,
+      })),
+    ),
+    recursos_confirmados_vs_esperados: centers.flatMap((center) =>
+      center.productos.map((product) => ({
+        centro_id: center.centro_id,
+        centro_nombre: center.nombre,
+        producto_id: product.producto_id,
+        producto_nombre: product.nombre,
+        recursos_confirmados:
+          product.inventario_confirmado_unidad_base,
+        recursos_esperados: product.donaciones_esperadas_unidad_base,
+        unidad: product.unidad_base,
+      })),
+    ),
+    voluntarios_disponibles_vs_requeridos: centers.map((center) => ({
+      centro_id: center.centro_id,
+      centro_nombre: center.nombre,
+      disponibles: center.voluntarios.disponibles,
+      requeridos: center.voluntarios.requeridos,
+      unidad: "persona",
+    })),
+  };
+
   const result = {
     snapshot: source.snapshot,
     centros: centers,
+    indicadores,
+    visualizaciones,
     donaciones_esperadas: source.expectedDonations,
     candidatos_traslado: recommendTransfers(balances, source.travelTimes),
   };

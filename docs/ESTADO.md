@@ -1,5 +1,26 @@
 # Estado del proyecto
 
+## Checkpoint M2
+
+- Estado: dashboard analítico y visual implementado sobre los contratos de M1; M3 no iniciado.
+- Interfaz: nuevo resumen operativo con seis tarjetas, cuatro gráficos comparativos y filtros por snapshot, centro y producto.
+- Compatibilidad: las seis secciones tabulares originales continúan disponibles y ambos snapshots demostrativos funcionan sin alterar sus datos.
+- Reglas visuales: cobertura no calculable se muestra como N/D, valores superiores a 100 % se conservan y recursos anunciados permanecen separados del inventario confirmado.
+- Arquitectura: transformaciones de presentación centralizadas en el modelo de vista y componentes gráficos reutilizables, sin dependencias nuevas ni fórmulas de negocio duplicadas en React.
+- Pruebas M2: unitarias 27/27, CSV 25/25, HTTP 14/14, lint, typecheck y build aprobados; validación visual sin errores de consola.
+- Evidencias: `output/screenshots/M2-resumen-operativo.jpg`, `output/screenshots/M2-graficos.jpg` e `output/pdf/INFORME_M2.pdf`.
+- Rama: `feature/admin-inspector`; commit de partida `529729e`; sin commit, push ni merge de M2.
+
+## Checkpoint M1
+
+- Estado: indicadores analíticos y contratos para visualizaciones implementados; gráficos no implementados.
+- API de dashboard: conserva los campos anteriores y añade centros activos, cobertura, déficit potencial, capacidad y cuatro colecciones para visualizaciones futuras.
+- Capacidad: cálculo de dominio listo; todos los centros actuales informan estado no calculable porque los CSV todavía no contienen capacidad máxima ni peso por presentación.
+- Persistencia: sin cambios en esquemas, encabezados, templates ni snapshots. La migración protegida está descrita en `docs/MIGRACION_CAPACIDAD_M1.md`.
+- Excel `PMU HERRAMIENTAS LIMONAR CALI 10-08-2026.xlsx`: no disponible en el espacio de trabajo; catálogo experimental pendiente.
+- Pruebas M1: unitarias 25/25, CSV 25/25, HTTP 14/14, lint, typecheck y build aprobados.
+- Rama: `feature/admin-inspector`; commit de partida `529729e`; sin commit, push ni merge de M1.
+
 ## Checkpoint E0
 
 - Estado: documentación técnica completada; verificación HTTP con incidencia de entorno/tiempo.
@@ -29,4 +50,4 @@
 1. Saneamiento de `.env.local` y selección de un commit común seguro.
 2. Repetir `test:http` en un checkout sin otro servidor Next activo.
 3. Asignar una tarea del catálogo a cada compañero.
-4. No iniciar capacidad, recepciones, jornadas, importación o gráficos sin misión aprobada.
+4. No iniciar capacidad, recepciones, jornadas, importación ni M3 sin misión aprobada.

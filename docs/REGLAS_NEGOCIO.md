@@ -5,9 +5,18 @@
 - El inventario confirmado se calcula como `SUM(cantidad_paquetes × contenido_por_paquete)`.
 - Los paquetes siempre son cantidades enteras; su contenido se expresa en la unidad base del producto.
 - Déficit: `max(0, objetivo_unidad_base - inventario_confirmado)`.
+- Cobertura: `inventario_confirmado / objetivo_unidad_base * 100`. Si el objetivo es cero, la cobertura no es calculable y se representa como `null`.
 - Excedente transferible: `max(0, inventario_confirmado - objetivo_unidad_base - reserva_unidad_base)`.
 - Donación esperada: suma de paquetes anunciados con estado `pendiente`, calculada aparte del inventario confirmado.
+- Déficit potencial: `max(0, objetivo_unidad_base - inventario_confirmado - donaciones_esperadas)`. No reemplaza el déficit confirmado.
 - Voluntarios faltantes: `max(0, requeridos - disponibles)`.
+
+## Capacidad de almacenamiento
+
+- Peso almacenado: `SUM(cantidad_paquetes × peso_kg_por_paquete)`.
+- Ocupación: `peso_almacenado_kg / capacidad_maxima_kg * 100`.
+- Existe sobrecapacidad cuando la ocupación es mayor que 100%.
+- Si falta la capacidad del centro o el peso de una presentación con inventario positivo, el indicador no es calculable. Los valores faltantes no se sustituyen por cero ni se infieren desde `ml`, `g`, `unidad` o el nombre del producto.
 
 La prioridad usa la escala `1 = alta`, `2 = media`, `3 = baja`.
 

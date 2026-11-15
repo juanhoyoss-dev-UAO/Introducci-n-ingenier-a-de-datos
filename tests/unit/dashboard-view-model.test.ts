@@ -3,12 +3,17 @@ import { describe, expect, it } from "vitest";
 import type { DashboardBundle } from "@/app/dashboard/types";
 import {
   centerRows,
+  coverageChartRows,
+  deriveOperationalSummary,
   deriveSummary,
   donationRows,
+  inventoryComparisonRows,
   inventoryRows,
   needRows,
+  resourceComparisonRows,
   sortSnapshots,
   travelTimeRows,
+  volunteerComparisonRows,
   volunteerRows,
 } from "@/app/dashboard/view-model";
 
@@ -87,6 +92,17 @@ const bundle: DashboardBundle = {
         zona: "Norte",
         coordinador_nombre: "Coordinación Norte",
         voluntarios: { disponibles: 2, requeridos: 5, faltantes: 3 },
+        capacidad_almacenamiento: {
+          calculable: false,
+          capacidad_maxima_kg: null,
+          peso_almacenado_kg: null,
+          ocupacion_porcentaje: null,
+          sobrecapacidad: null,
+          datos_faltantes: [
+            "capacidad_maxima_kg",
+            "peso_kg_por_paquete",
+          ],
+        },
         productos: [
           {
             producto_id: "P01",
@@ -97,6 +113,8 @@ const bundle: DashboardBundle = {
             reserva_unidad_base: 0,
             prioridad: 1,
             deficit_confirmado_unidad_base: 8_000,
+            cobertura_porcentaje: 60,
+            deficit_potencial_unidad_base: 2_000,
             excedente_transferible_unidad_base: 0,
             donaciones_esperadas_unidad_base: 6_000,
             existencias: [
@@ -122,6 +140,14 @@ const bundle: DashboardBundle = {
         zona: "Sur",
         coordinador_nombre: "Coordinación Sur",
         voluntarios: { disponibles: 4, requeridos: 4, faltantes: 0 },
+        capacidad_almacenamiento: {
+          calculable: false,
+          capacidad_maxima_kg: null,
+          peso_almacenado_kg: null,
+          ocupacion_porcentaje: null,
+          sobrecapacidad: null,
+          datos_faltantes: ["capacidad_maxima_kg"],
+        },
         productos: [
           {
             producto_id: "P01",
@@ -132,6 +158,8 @@ const bundle: DashboardBundle = {
             reserva_unidad_base: 0,
             prioridad: null,
             deficit_confirmado_unidad_base: 0,
+            cobertura_porcentaje: null,
+            deficit_potencial_unidad_base: 0,
             excedente_transferible_unidad_base: 0,
             donaciones_esperadas_unidad_base: 0,
             existencias: [],
@@ -139,6 +167,85 @@ const bundle: DashboardBundle = {
         ],
       },
     ],
+    indicadores: { centros_activos: 2 },
+    visualizaciones: {
+      cobertura_por_centro: [
+        {
+          centro_id: "C01",
+          centro_nombre: "Centro Norte",
+          producto_id: "P01",
+          producto_nombre: "Agua",
+          cobertura_porcentaje: 60,
+          unidad: "porcentaje",
+          unidad_base_producto: "ml",
+        },
+        {
+          centro_id: "C02",
+          centro_nombre: "Centro Sur",
+          producto_id: "P01",
+          producto_nombre: "Agua",
+          cobertura_porcentaje: null,
+          unidad: "porcentaje",
+          unidad_base_producto: "ml",
+        },
+      ],
+      inventario_vs_necesidad: [
+        {
+          centro_id: "C01",
+          centro_nombre: "Centro Norte",
+          producto_id: "P01",
+          producto_nombre: "Agua",
+          inventario_confirmado: 12_000,
+          necesidad_vigente: 20_000,
+          unidad: "ml",
+        },
+        {
+          centro_id: "C02",
+          centro_nombre: "Centro Sur",
+          producto_id: "P01",
+          producto_nombre: "Agua",
+          inventario_confirmado: 0,
+          necesidad_vigente: 0,
+          unidad: "ml",
+        },
+      ],
+      recursos_confirmados_vs_esperados: [
+        {
+          centro_id: "C01",
+          centro_nombre: "Centro Norte",
+          producto_id: "P01",
+          producto_nombre: "Agua",
+          recursos_confirmados: 12_000,
+          recursos_esperados: 6_000,
+          unidad: "ml",
+        },
+        {
+          centro_id: "C02",
+          centro_nombre: "Centro Sur",
+          producto_id: "P01",
+          producto_nombre: "Agua",
+          recursos_confirmados: 0,
+          recursos_esperados: 0,
+          unidad: "ml",
+        },
+      ],
+      voluntarios_disponibles_vs_requeridos: [
+        {
+          centro_id: "C01",
+          centro_nombre: "Centro Norte",
+          disponibles: 2,
+          requeridos: 5,
+          unidad: "persona",
+        },
+        {
+          centro_id: "C02",
+          centro_nombre: "Centro Sur",
+          disponibles: 4,
+          requeridos: 4,
+          unidad: "persona",
+        },
+      ],
+    },
     donaciones_esperadas: [
       {
         snapshot_id: SNAPSHOT_ID,
@@ -174,6 +281,64 @@ describe("modelo de vista del inspector D0", () => {
       centrosConDeficit: 1,
       donacionesAnunciadas: 1,
     });
+  });
+
+  it("deriva tarjetas operativas desde métricas entregadas por el backend", () => {
+    expect(deriveOperationalSummary(bundle, "all")).toEqual({
+      centrosActivos: 2,
+      centrosConDeficit: 1,
+      productos: 1,
+      centrosConNecesidades: 1,
+      donacionesPendientes: 1,
+      centrosConVoluntariosFaltantes: 1,
+      atencion: {
+        centro_id: "C01",
+        centro_nombre: "Centro Norte",
+        productosConDeficit: 1,
+        voluntariosFaltantes: 3,
+      },
+    });
+    expect(deriveOperationalSummary(bundle, "C02")).toMatchObject({
+      centrosActivos: 1,
+      centrosConDeficit: 0,
+      centrosConNecesidades: 0,
+      donacionesPendientes: 0,
+      centrosConVoluntariosFaltantes: 0,
+      atencion: null,
+    });
+  });
+
+  it("filtra las cuatro visualizaciones sin mezclar centro ni producto", () => {
+    expect(coverageChartRows(bundle, "all", "P01")).toHaveLength(2);
+    expect(coverageChartRows(bundle, "C02", "P01")).toEqual([
+      expect.objectContaining({
+        centro_id: "C02",
+        cobertura_porcentaje: null,
+      }),
+    ]);
+    expect(inventoryComparisonRows(bundle, "C01", "P01")).toEqual([
+      expect.objectContaining({
+        centro_id: "C01",
+        inventario_confirmado: 12_000,
+        necesidad_vigente: 20_000,
+        deficit_confirmado: 8_000,
+        unidad: "ml",
+      }),
+    ]);
+    expect(resourceComparisonRows(bundle, "C01", "P01")).toEqual([
+      expect.objectContaining({
+        recursos_confirmados: 12_000,
+        recursos_esperados: 6_000,
+        unidad: "ml",
+      }),
+    ]);
+    expect(volunteerComparisonRows(bundle, "C01")).toEqual([
+      expect.objectContaining({
+        disponibles: 2,
+        requeridos: 5,
+        faltantes: 3,
+      }),
+    ]);
   });
 
   it("expone inventario físico y necesidad sin sumar la donación anunciada", () => {
