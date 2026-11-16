@@ -1,72 +1,43 @@
-import type {
-  CenterFilter,
-  DashboardBundle,
-  DashboardTab,
-} from "../types";
+import type { CenterFilter, DashboardBundle } from "../types";
 import {
+  ALL_PRODUCTS_FILTER,
   coverageChartRows,
+  coverageMatrixRows,
   deriveOperationalSummary,
   inventoryComparisonRows,
+  operationalSummaryVisualizationState,
+  productCoverageRows,
   resourceComparisonRows,
   volunteerComparisonRows,
 } from "../view-model";
 import { CoverageChart } from "./coverage-chart";
+import { CoverageMatrix } from "./coverage-matrix";
 import { InventoryNeedsChart } from "./inventory-needs-chart";
 import { MetricCards } from "./metric-cards";
+import { ProductCoverageChart } from "./product-coverage-chart";
 import { ResourcesChart } from "./resources-chart";
 import { VolunteerChart } from "./volunteer-chart";
-
-const DETAIL_LINKS: ReadonlyArray<{
-  id: Exclude<DashboardTab, "resumen">;
-  label: string;
-  description: string;
-}> = [
-  {
-    id: "alertas",
-    label: "Alertas operativas",
-    description: "Condiciones activas y acciones sugeridas",
-  },
-  { id: "centros", label: "Centros", description: "Estado y coordinación" },
-  {
-    id: "inventario",
-    label: "Inventario",
-    description: "Paquetes y presentaciones",
-  },
-  {
-    id: "necesidades",
-    label: "Necesidades",
-    description: "Objetivos, déficit y prioridad",
-  },
-  {
-    id: "voluntarios",
-    label: "Voluntarios",
-    description: "Disponibles y requeridos",
-  },
-  {
-    id: "donaciones",
-    label: "Donaciones",
-    description: "Recursos pendientes",
-  },
-  {
-    id: "tiempos",
-    label: "Tiempos",
-    description: "Traslados dirigidos",
-  },
-];
 
 export function OperationalSummary({
   bundle,
   centerFilter,
   productId,
-  onOpenTab,
 }: {
   bundle: DashboardBundle;
   centerFilter: CenterFilter;
   productId: string;
-  onOpenTab: (tab: Exclude<DashboardTab, "resumen">) => void;
 }) {
   const summary = deriveOperationalSummary(bundle, centerFilter);
+  const showAllProducts = productId === ALL_PRODUCTS_FILTER;
+  const visualization = operationalSummaryVisualizationState(
+    centerFilter,
+    productId,
+  );
   const product = bundle.products.find((item) => item.producto_id === productId);
+  const coverageMatrix = coverageMatrixRows(bundle, centerFilter);
+  const productCoverage = visualization.mostrarCoberturaProductos
+    ? productCoverageRows(bundle, centerFilter)
+    : [];
   const coverageRows = coverageChartRows(bundle, centerFilter, productId);
   const inventoryRows = inventoryComparisonRows(
     bundle,
@@ -89,7 +60,9 @@ export function OperationalSummary({
             </h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
               Comparación de recursos, necesidades y personal con datos del
-              snapshot seleccionado. Producto visible: {product?.nombre ?? "sin selección"}.
+              snapshot seleccionado. Producto visible: {showAllProducts
+                ? "todos los productos"
+                : (product?.nombre ?? "sin selección")}.
             </p>
           </div>
           <div className="rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 lg:max-w-sm">
@@ -122,44 +95,28 @@ export function OperationalSummary({
 
       <MetricCards summary={summary} />
 
-      <section
-        aria-label="Gráficos comparativos"
-        className="grid gap-5 xl:grid-cols-2"
-      >
-        <CoverageChart rows={coverageRows} />
-        <VolunteerChart rows={volunteerRows} />
-        <InventoryNeedsChart rows={inventoryRows} />
-        <ResourcesChart rows={resourceRows} />
-      </section>
+      {visualization.mostrarMatriz ? (
+        <CoverageMatrix matrix={coverageMatrix} />
+      ) : null}
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-        <div>
-          <h3 className="text-base font-semibold tracking-tight text-slate-950">
-            Consultar detalle
-          </h3>
-          <p className="mt-1 text-sm text-slate-600">
-            Las secciones operativas conservan sus tablas y el filtro de centro
-            actual; las alertas llevan al apartado relacionado.
-          </p>
-        </div>
-        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {DETAIL_LINKS.map((link) => (
-            <button
-              className="rounded-xl border border-slate-200 px-4 py-3 text-left transition hover:border-blue-300 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
-              key={link.id}
-              onClick={() => onOpenTab(link.id)}
-              type="button"
-            >
-              <span className="block text-sm font-semibold text-slate-950">
-                {link.label}
-              </span>
-              <span className="mt-1 block text-xs text-slate-500">
-                {link.description}
-              </span>
-            </button>
-          ))}
-        </div>
-      </section>
+      {visualization.mostrarCoberturaProductos ? (
+        <ProductCoverageChart rows={productCoverage} />
+      ) : null}
+
+      {visualization.mostrarVoluntarios ? (
+        <VolunteerChart rows={volunteerRows} />
+      ) : null}
+
+      {visualization.mostrarGraficosIndividuales ? (
+        <section
+          aria-label="Gráficos comparativos"
+          className="grid gap-5 xl:grid-cols-2"
+        >
+          <CoverageChart rows={coverageRows} />
+          <InventoryNeedsChart rows={inventoryRows} />
+          <ResourcesChart rows={resourceRows} />
+        </section>
+      ) : null}
     </div>
   );
 }

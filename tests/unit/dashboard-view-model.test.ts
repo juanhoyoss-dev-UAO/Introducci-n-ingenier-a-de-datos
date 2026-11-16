@@ -2,19 +2,27 @@ import { describe, expect, it } from "vitest";
 
 import type { DashboardBundle } from "@/app/dashboard/types";
 import {
+  coverageMatrixRows,
+  coverageMatrixState,
   centerRows,
   coverageChartRows,
   deriveOperationalSummary,
   deriveSummary,
   donationRows,
+  findWeeklyOperationalSnapshot,
   inventoryComparisonRows,
   inventoryRows,
   needRows,
+  operationalSummaryVisualizationState,
+  productCoverageRows,
   resourceComparisonRows,
   sortSnapshots,
+  summarySnapshotOptions,
   travelTimeRows,
   volunteerComparisonRows,
   volunteerRows,
+  WEEKLY_OPERATIONAL_SNAPSHOT_ID,
+  WEEKLY_SCENARIO_ID,
 } from "@/app/dashboard/view-model";
 
 const SNAPSHOT_ID = "10000000-0000-4000-8000-000000000001";
@@ -292,6 +300,30 @@ describe("modelo de vista del inspector D0", () => {
     expect(ordered.map((snapshot) => snapshot.id)).toEqual(["a", "c", "b"]);
   });
 
+  it("limita el resumen al estado final del escenario semanal real", () => {
+    const snapshots = [
+      {
+        id: "10000000-0000-4000-8000-000000000001",
+        escenario_id: "10000000-0000-4000-8000-000000000001",
+      },
+      {
+        id: "65000000-0000-4000-8000-000000000002",
+        escenario_id: WEEKLY_SCENARIO_ID,
+      },
+      {
+        id: WEEKLY_OPERATIONAL_SNAPSHOT_ID,
+        escenario_id: WEEKLY_SCENARIO_ID,
+      },
+    ];
+
+    expect(findWeeklyOperationalSnapshot(snapshots)?.id).toBe(
+      WEEKLY_OPERATIONAL_SNAPSHOT_ID,
+    );
+    expect(summarySnapshotOptions(snapshots).map((snapshot) => snapshot.id)).toEqual([
+      WEEKLY_OPERATIONAL_SNAPSHOT_ID,
+    ]);
+  });
+
   it("calcula el resumen con catálogos e intenciones reales", () => {
     expect(deriveSummary(bundle)).toEqual({
       centros: 2,
@@ -360,6 +392,100 @@ describe("modelo de vista del inspector D0", () => {
         disponibles: 2,
         requeridos: 5,
         faltantes: 3,
+      }),
+    ]);
+  });
+
+  it("construye la matriz desde indicadores del backend y respeta el centro", () => {
+    const matrix = coverageMatrixRows(bundle, "all");
+    expect(matrix.centros.map((center) => center.centro_id)).toEqual([
+      "C01",
+      "C02",
+    ]);
+    expect(matrix.filas).toHaveLength(1);
+    expect(matrix.filas[0]).toMatchObject({
+      producto_id: "P01",
+      unidad_base: "ml",
+      deficit_total_unidad_base: 8_000,
+    });
+    expect(matrix.filas[0]?.celdas).toEqual([
+      expect.objectContaining({
+        centro_id: "C01",
+        inventario_confirmado_unidad_base: 12_000,
+        objetivo_unidad_base: 20_000,
+        deficit_confirmado_unidad_base: 8_000,
+        cobertura_porcentaje: 60,
+        estado: "deficit_importante",
+      }),
+      expect.objectContaining({
+        centro_id: "C02",
+        cobertura_porcentaje: null,
+        estado: "sin_necesidad",
+      }),
+    ]);
+
+    const filtered = coverageMatrixRows(bundle, "C02");
+    expect(filtered.centros).toEqual([
+      expect.objectContaining({ centro_id: "C02" }),
+    ]);
+    expect(filtered.filas[0]?.celdas).toHaveLength(1);
+  });
+
+  it("distingue déficit, cobertura, excedente y ausencia de necesidad", () => {
+    const state = (
+      coverage: number | null,
+      target: number,
+      deficit: number,
+      surplus: number,
+    ) =>
+      coverageMatrixState({
+        cobertura_porcentaje: coverage,
+        objetivo_unidad_base: target,
+        deficit_confirmado_unidad_base: deficit,
+        excedente_transferible_unidad_base: surplus,
+      });
+
+    expect(state(25, 100, 75, 0)).toBe("deficit_importante");
+    expect(state(85, 100, 15, 0)).toBe("deficit_parcial");
+    expect(state(100, 100, 0, 0)).toBe("cubierta");
+    expect(state(125, 100, 0, 25)).toBe("excedente");
+    expect(state(null, 0, 0, 0)).toBe("sin_necesidad");
+  });
+
+  it("selecciona una sola familia de visualizaciones para cada combinación", () => {
+    expect(operationalSummaryVisualizationState("all", "all")).toEqual({
+      mostrarMatriz: true,
+      mostrarCoberturaProductos: false,
+      mostrarVoluntarios: true,
+      mostrarGraficosIndividuales: false,
+    });
+    expect(operationalSummaryVisualizationState("C01", "all")).toEqual({
+      mostrarMatriz: false,
+      mostrarCoberturaProductos: true,
+      mostrarVoluntarios: true,
+      mostrarGraficosIndividuales: false,
+    });
+    expect(operationalSummaryVisualizationState("all", "P01")).toEqual({
+      mostrarMatriz: false,
+      mostrarCoberturaProductos: false,
+      mostrarVoluntarios: false,
+      mostrarGraficosIndividuales: true,
+    });
+    expect(operationalSummaryVisualizationState("C01", "P01")).toEqual({
+      mostrarMatriz: false,
+      mostrarCoberturaProductos: false,
+      mostrarVoluntarios: false,
+      mostrarGraficosIndividuales: true,
+    });
+  });
+
+  it("proyecta las barras de productos de un único centro con el orden existente", () => {
+    expect(productCoverageRows(bundle, "C01")).toEqual([
+      expect.objectContaining({
+        centro_id: "C01",
+        producto_id: "P01",
+        cobertura_porcentaje: 60,
+        estado: "deficit_importante",
       }),
     ]);
   });

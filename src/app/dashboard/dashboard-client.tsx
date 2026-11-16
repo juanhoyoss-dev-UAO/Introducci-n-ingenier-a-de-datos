@@ -13,13 +13,17 @@ import { OperationalSummary } from "./components/operational-summary";
 import { MovementEditor } from "./components/movement-editor";
 import { TemporalEvolution } from "./components/temporal-evolution";
 import {
+  ALL_PRODUCTS_FILTER,
   centerRows,
   donationRows,
+  findWeeklyOperationalSnapshot,
   inventoryRows,
   needRows,
   sortSnapshots,
+  summarySnapshotOptions,
   travelTimeRows,
   volunteerRows,
+  WEEKLY_SCENARIO_LABEL,
 } from "./view-model";
 import type {
   ApiFailure,
@@ -193,7 +197,7 @@ export default function DashboardClient({
   const [snapshots, setSnapshots] = useState<SnapshotRecord[]>([]);
   const [selectedSnapshotId, setSelectedSnapshotId] = useState("");
   const [centerFilter, setCenterFilter] = useState<CenterFilter>("all");
-  const [productFilter, setProductFilter] = useState("");
+  const [productFilter, setProductFilter] = useState(ALL_PRODUCTS_FILTER);
   const [activeTab, setActiveTab] = useState<DashboardTab>("resumen");
   const [bundle, setBundle] = useState<DashboardBundle | null>(null);
   const [bootstrapping, setBootstrapping] = useState(true);
@@ -202,6 +206,11 @@ export default function DashboardClient({
   const [error, setError] = useState("");
   const [mutationNotice, setMutationNotice] = useState("");
   const [reloadToken, setReloadToken] = useState(0);
+  const selectableSnapshots = useMemo(
+    () =>
+      activeTab === "resumen" ? summarySnapshotOptions(snapshots) : snapshots,
+    [activeTab, snapshots],
+  );
 
   useEffect(() => {
     const controller = new AbortController();
@@ -233,13 +242,19 @@ export default function DashboardClient({
         }
 
         const orderedSnapshots = sortSnapshots(availableSnapshots);
+        const weeklySnapshot = findWeeklyOperationalSnapshot(orderedSnapshots);
         setUser(session.user);
         setSnapshots(orderedSnapshots);
-        setLoading(orderedSnapshots.length > 0);
-        setSelectedSnapshotId(orderedSnapshots[0]?.id ?? "");
+        setLoading(weeklySnapshot !== null);
+        setSelectedSnapshotId(weeklySnapshot?.id ?? "");
+        if (!weeklySnapshot && orderedSnapshots.length > 0) {
+          setError(
+            "No se encontró el estado operativo final del escenario semanal.",
+          );
+        }
         logger.ok("UI", "snapshots_loaded", {
           count: orderedSnapshots.length,
-          selectedSnapshotId: orderedSnapshots[0]?.id ?? null,
+          selectedSnapshotId: weeklySnapshot?.id ?? null,
         });
       } catch (caught) {
         if (!current || controller.signal.aborted) {
@@ -324,9 +339,10 @@ export default function DashboardClient({
 
         setBundle({ snapshot, centers, products, travelTimes, dashboard });
         setProductFilter((current) =>
+          current === ALL_PRODUCTS_FILTER ||
           products.some((product) => product.producto_id === current)
             ? current
-            : (products[0]?.producto_id ?? ""),
+            : ALL_PRODUCTS_FILTER,
         );
         logger.ok("UI", "snapshot_load_completed", {
           snapshotId: selectedSnapshotId,
@@ -434,7 +450,7 @@ export default function DashboardClient({
     logger.info("UI", "snapshot_selected", { snapshotId });
     setBundle(null);
     setCenterFilter("all");
-    setProductFilter("");
+    setProductFilter(ALL_PRODUCTS_FILTER);
     setError("");
     setMutationNotice("");
     setLoading(true);
@@ -444,7 +460,7 @@ export default function DashboardClient({
   function retrySnapshot() {
     setBundle(null);
     setCenterFilter("all");
-    setProductFilter("");
+    setProductFilter(ALL_PRODUCTS_FILTER);
     setError("");
     setMutationNotice("");
     setLoading(true);
@@ -459,6 +475,16 @@ export default function DashboardClient({
   function selectProduct(productId: string) {
     logger.info("UI", "product_filter_selected", { productId });
     setProductFilter(productId);
+  }
+
+  function selectDashboardTab(tab: DashboardTab) {
+    if (tab === "resumen") {
+      const weeklySnapshot = findWeeklyOperationalSnapshot(snapshots);
+      if (weeklySnapshot && weeklySnapshot.id !== selectedSnapshotId) {
+        selectSnapshot(weeklySnapshot.id);
+      }
+    }
+    setActiveTab(tab);
   }
 
   async function saveOperationalUpdate(update: OperationalUpdate) {
@@ -550,7 +576,6 @@ export default function DashboardClient({
         <OperationalSummary
           bundle={bundle}
           centerFilter={centerFilter}
-          onOpenTab={setActiveTab}
           productId={productFilter}
         />
       );
@@ -576,7 +601,11 @@ export default function DashboardClient({
         <TemporalEvolution
           centers={bundle.centers}
           initialCenterFilter={centerFilter}
-          initialProductId={productFilter}
+          initialProductId={
+            productFilter === ALL_PRODUCTS_FILTER
+              ? (bundle.products[0]?.producto_id ?? "")
+              : productFilter
+          }
           key={`${bundle.snapshot.id}-${centerFilter}-${productFilter}`}
           products={bundle.products}
           snapshot={bundle.snapshot}
@@ -751,14 +780,22 @@ export default function DashboardClient({
             Snapshot operativo
             <select
               className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-slate-950 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100"
-              disabled={bootstrapping || snapshots.length === 0}
+              disabled={bootstrapping || selectableSnapshots.length === 0}
               onChange={(event) => selectSnapshot(event.target.value)}
               value={selectedSnapshotId}
             >
-              {snapshots.length === 0 ? <option value="">Sin snapshots disponibles</option> : null}
-              {snapshots.map((snapshot) => (
+              {selectableSnapshots.length === 0 ? (
+                <option value="">
+                  {snapshots.length === 0
+                    ? "Sin snapshots disponibles"
+                    : "Escenario semanal no disponible"}
+                </option>
+              ) : null}
+              {selectableSnapshots.map((snapshot) => (
                 <option key={snapshot.id} value={snapshot.id}>
-                  {snapshot.nombre} · {formatDate(snapshot.created_at)}
+                  {activeTab === "resumen"
+                    ? WEEKLY_SCENARIO_LABEL
+                    : `${snapshot.nombre} · ${formatDate(snapshot.created_at)}`}
                 </option>
               ))}
             </select>
@@ -788,6 +825,9 @@ export default function DashboardClient({
                 onChange={(event) => selectProduct(event.target.value)}
                 value={productFilter}
               >
+                {bundle && bundle.products.length > 0 ? (
+                  <option value={ALL_PRODUCTS_FILTER}>Todos los productos</option>
+                ) : null}
                 {bundle?.products.length === 0 ? (
                   <option value="">Sin productos disponibles</option>
                 ) : null}
@@ -845,7 +885,7 @@ export default function DashboardClient({
                   className={`border-b-2 px-4 py-3 text-sm font-semibold transition ${activeTab === tab.id ? "border-blue-700 text-blue-800" : "border-transparent text-slate-600 hover:border-slate-400 hover:text-slate-950"}`}
                   id={`tab-${tab.id}`}
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
+                  onClick={() => selectDashboardTab(tab.id)}
                   role="tab"
                   type="button"
                 >

@@ -14,6 +14,14 @@ import type {
   ProductRecord,
   TravelTimeRecord,
 } from "./types";
+import { DEFAULT_ALERT_THRESHOLDS } from "@/domain/alerts";
+
+export const WEEKLY_SCENARIO_ID = "65000000-0000-4000-8000-000000000001";
+export const WEEKLY_OPERATIONAL_SNAPSHOT_ID =
+  "65000000-0000-4000-8000-000000000003";
+export const WEEKLY_SCENARIO_LABEL =
+  "Emergencia simulada de Cali — Semana del 9 al 15 de noviembre de 2026.";
+export const ALL_PRODUCTS_FILTER = "all";
 
 export interface DashboardSummary {
   centros: number;
@@ -95,6 +103,47 @@ export interface DonationTableRow extends ExpectedDonationRecord {
   total_unidad_base: number;
 }
 
+export type CoverageMatrixState =
+  | "deficit_importante"
+  | "deficit_parcial"
+  | "cubierta"
+  | "excedente"
+  | "sin_necesidad";
+
+export interface CoverageMatrixCell {
+  centro_id: string;
+  centro_nombre: string;
+  producto_id: string;
+  producto_nombre: string;
+  unidad_base: DashboardProduct["unidad_base"];
+  inventario_confirmado_unidad_base: number;
+  objetivo_unidad_base: number;
+  deficit_confirmado_unidad_base: number;
+  excedente_transferible_unidad_base: number;
+  cobertura_porcentaje: number | null;
+  estado: CoverageMatrixState;
+}
+
+export interface CoverageMatrixRow {
+  producto_id: string;
+  producto_nombre: string;
+  unidad_base: DashboardProduct["unidad_base"];
+  deficit_total_unidad_base: number;
+  celdas: Array<CoverageMatrixCell | null>;
+}
+
+export interface CoverageMatrix {
+  centros: Array<{ centro_id: string; centro_nombre: string }>;
+  filas: CoverageMatrixRow[];
+}
+
+export interface OperationalSummaryVisualizationState {
+  mostrarMatriz: boolean;
+  mostrarCoberturaProductos: boolean;
+  mostrarVoluntarios: boolean;
+  mostrarGraficosIndividuales: boolean;
+}
+
 function matchesCenter(centerId: string, filter: CenterFilter) {
   return filter === "all" || centerId === filter;
 }
@@ -117,6 +166,162 @@ export function sortSnapshots<T extends { id: string; created_at: string }>(
     (left, right) =>
       left.created_at.localeCompare(right.created_at) ||
       left.id.localeCompare(right.id),
+  );
+}
+
+export function findWeeklyOperationalSnapshot<
+  T extends { id: string; escenario_id?: string },
+>(snapshots: readonly T[]) {
+  return (
+    snapshots.find(
+      (snapshot) =>
+        snapshot.id === WEEKLY_OPERATIONAL_SNAPSHOT_ID &&
+        snapshot.escenario_id === WEEKLY_SCENARIO_ID,
+    ) ?? null
+  );
+}
+
+export function summarySnapshotOptions<
+  T extends { id: string; escenario_id?: string },
+>(snapshots: readonly T[]) {
+  const weeklySnapshot = findWeeklyOperationalSnapshot(snapshots);
+  return weeklySnapshot ? [weeklySnapshot] : [];
+}
+
+export function operationalSummaryVisualizationState(
+  centerFilter: CenterFilter,
+  productId: string,
+): OperationalSummaryVisualizationState {
+  const allCenters = centerFilter === "all";
+  const allProducts = productId === ALL_PRODUCTS_FILTER;
+  return {
+    mostrarMatriz: allCenters && allProducts,
+    mostrarCoberturaProductos: !allCenters && allProducts,
+    mostrarVoluntarios: allProducts,
+    mostrarGraficosIndividuales: !allProducts,
+  };
+}
+
+export function coverageMatrixState(
+  product: Pick<
+    DashboardProduct,
+    | "objetivo_unidad_base"
+    | "deficit_confirmado_unidad_base"
+    | "cobertura_porcentaje"
+    | "excedente_transferible_unidad_base"
+  >,
+): CoverageMatrixState {
+  if (
+    product.objetivo_unidad_base <= 0 ||
+    product.cobertura_porcentaje === null
+  ) {
+    return "sin_necesidad";
+  }
+  if (product.excedente_transferible_unidad_base > 0) {
+    return "excedente";
+  }
+  if (product.deficit_confirmado_unidad_base <= 0) {
+    return "cubierta";
+  }
+  return product.cobertura_porcentaje <
+    DEFAULT_ALERT_THRESHOLDS.cobertura_importante_menor_que
+    ? "deficit_importante"
+    : "deficit_parcial";
+}
+
+export function coverageMatrixRows(
+  bundle: DashboardBundle,
+  filter: CenterFilter,
+): CoverageMatrix {
+  const centers = bundle.dashboard.centros.filter((center) =>
+    matchesCenter(center.centro_id, filter),
+  );
+  const rows = bundle.products.map((catalogProduct) => {
+    const cells = centers.map((center) => {
+      const product = center.productos.find(
+        (item) => item.producto_id === catalogProduct.producto_id,
+      );
+      if (!product) {
+        return null;
+      }
+      return {
+        centro_id: center.centro_id,
+        centro_nombre: center.nombre,
+        producto_id: product.producto_id,
+        producto_nombre: product.nombre,
+        unidad_base: product.unidad_base,
+        inventario_confirmado_unidad_base:
+          product.inventario_confirmado_unidad_base,
+        objetivo_unidad_base: product.objetivo_unidad_base,
+        deficit_confirmado_unidad_base:
+          product.deficit_confirmado_unidad_base,
+        excedente_transferible_unidad_base:
+          product.excedente_transferible_unidad_base,
+        cobertura_porcentaje: product.cobertura_porcentaje,
+        estado: coverageMatrixState(product),
+      } satisfies CoverageMatrixCell;
+    });
+    return {
+      producto_id: catalogProduct.producto_id,
+      producto_nombre: catalogProduct.nombre,
+      unidad_base: catalogProduct.unidad_base,
+      deficit_total_unidad_base: cells.reduce(
+        (total, cell) =>
+          total + (cell?.deficit_confirmado_unidad_base ?? 0),
+        0,
+      ),
+      celdas: cells,
+    } satisfies CoverageMatrixRow;
+  });
+
+  rows.sort(
+    (left, right) => {
+      const leftDeficits = left.celdas.filter(
+        (cell) => (cell?.deficit_confirmado_unidad_base ?? 0) > 0,
+      );
+      const rightDeficits = right.celdas.filter(
+        (cell) => (cell?.deficit_confirmado_unidad_base ?? 0) > 0,
+      );
+      const leftImportant = leftDeficits.filter(
+        (cell) => cell?.estado === "deficit_importante",
+      ).length;
+      const rightImportant = rightDeficits.filter(
+        (cell) => cell?.estado === "deficit_importante",
+      ).length;
+      const leftLowestCoverage = Math.min(
+        ...leftDeficits.map((cell) => cell?.cobertura_porcentaje ?? 100),
+        100,
+      );
+      const rightLowestCoverage = Math.min(
+        ...rightDeficits.map((cell) => cell?.cobertura_porcentaje ?? 100),
+        100,
+      );
+
+      return (
+        rightImportant - leftImportant ||
+        rightDeficits.length - leftDeficits.length ||
+        leftLowestCoverage - rightLowestCoverage ||
+        left.producto_nombre.localeCompare(right.producto_nombre, "es") ||
+        left.producto_id.localeCompare(right.producto_id)
+      );
+    },
+  );
+
+  return {
+    centros: centers.map((center) => ({
+      centro_id: center.centro_id,
+      centro_nombre: center.nombre,
+    })),
+    filas: rows,
+  };
+}
+
+export function productCoverageRows(
+  bundle: DashboardBundle,
+  centerId: Exclude<CenterFilter, "all">,
+): CoverageMatrixCell[] {
+  return coverageMatrixRows(bundle, centerId).filas.flatMap((row) =>
+    row.celdas.flatMap((cell) => (cell ? [cell] : [])),
   );
 }
 
