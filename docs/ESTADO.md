@@ -1,5 +1,19 @@
 # Estado del proyecto
 
+## Checkpoint M6.5
+
+- Estado: escenario semanal integral SIMULADO implementado y listo para analisis; M7 no iniciado.
+- Periodo: 9 al 15 de noviembre de 2026 en `America/Bogota`, con seis centros y dos snapshots nuevos (inicio y semana completa). Los snapshots A y B permanecen intactos.
+- Catalogo: 32 productos y 40 presentaciones en ocho categorias. El Excel de referencia no estaba disponible; ninguna fila se atribuye a ese archivo.
+- Volumen: 352 eventos, 80 anuncios, 90 recepciones, 57 despachos, 84 evaluaciones de voluntariado y 42 cambios de necesidad.
+- Temporalidad: reconstruccion fisica completa al cierre, registros demorados, perspectiva informativa diferenciada y alertas evaluadas con hora simulada.
+- Generacion: configuracion versionada, semilla fija, staging, validaciones previas e idempotencia por comparacion exacta.
+- Integracion: el dashboard puede seleccionar el escenario y el corte temporal se inicializa desde la fecha del snapshot, no desde el reloj real del equipo.
+- Pruebas M6.5: unitarias 67/67, CSV 36/36, escenario 5/5, HTTP 23/23, lint, typecheck y build aprobados. Las dos primeras corridas HTTP no ejecutaron casos por aislamiento de sockets; la corrida fuera de ese aislamiento aprobo completa.
+- Verificacion visual: no ejecutada porque esta sesion no expuso control de navegador. Las consultas HTTP reales validaron 6 centros, 32 productos, 80 intenciones y 352 eventos aplicados.
+- Rama: `feature/admin-inspector`; commit de partida `0c57659`; sin commit, push, merge ni rebase.
+- Informe detallado: `docs/ESCENARIO_SEMANAL_M6_5.md`.
+
 ## Checkpoint M5
 
 - Estado: motor puro de alertas y centro de monitoreo integrados; simulación temporal e historial persistente de alertas no iniciados.

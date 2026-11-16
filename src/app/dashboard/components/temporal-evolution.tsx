@@ -92,7 +92,9 @@ export function TemporalEvolution({
   );
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
-  const [cutoff, setCutoff] = useState(() => bogotaInputValue(new Date()));
+  const [cutoff, setCutoff] = useState(() =>
+    bogotaInputValue(new Date(snapshot.created_at)),
+  );
   const [analysis, setAnalysis] = useState<TemporalAnalysisResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");

@@ -98,7 +98,7 @@ describe("repositorio CSV", () => {
         runtimeRoot: roots.runtimeRoot,
       });
 
-      await expect(repository.listSnapshots()).resolves.toHaveLength(2);
+      await expect(repository.listSnapshots()).resolves.toHaveLength(4);
       const [centers, products, presentations] = await Promise.all([
         repository.listCenters(SNAPSHOT_A),
         repository.listProducts(SNAPSHOT_A),
@@ -511,7 +511,7 @@ describe("repositorio CSV", () => {
         ),
       ).rejects.toMatchObject({ code: "INVALID_REFERENCE" });
 
-      await expect(repository.listSnapshots()).resolves.toHaveLength(2);
+      await expect(repository.listSnapshots()).resolves.toHaveLength(4);
       await expect(repository.listInventory(SNAPSHOT_A)).resolves.toContainEqual({
         snapshot_id: SNAPSHOT_A,
         centro_id: "C01",
@@ -780,7 +780,7 @@ describe("repositorio CSV", () => {
       expect(first.idempotent).toBe(false);
       expect(repeated.idempotent).toBe(true);
       expect(repeated.snapshot.id).toBe(first.snapshot.id);
-      expect(snapshots).toHaveLength(3);
+      expect(snapshots).toHaveLength(5);
       expect(water(original)).toMatchObject({
         inventario_confirmado_unidad_base: 12_000,
         deficit_confirmado_unidad_base: 8_000,
@@ -881,7 +881,7 @@ describe("repositorio CSV", () => {
           repository,
         ),
       ).rejects.toMatchObject({ code: "INSUFFICIENT_INVENTORY" });
-      await expect(repository.listSnapshots()).resolves.toHaveLength(2);
+      await expect(repository.listSnapshots()).resolves.toHaveLength(4);
       await expect(repository.listMovements(SNAPSHOT_A)).resolves.toEqual([]);
     } finally {
       await roots.cleanup();
@@ -915,7 +915,7 @@ describe("repositorio CSV", () => {
           repository,
         ),
       ).rejects.toMatchObject({ code: "PERSISTENCE_ERROR" });
-      await expect(repository.listSnapshots()).resolves.toHaveLength(2);
+      await expect(repository.listSnapshots()).resolves.toHaveLength(4);
       await expect(repository.listInventory(SNAPSHOT_A)).resolves.toContainEqual(
         expect.objectContaining({
           centro_id: "C01",

@@ -23,6 +23,12 @@ export const operationalTemporalPayloadSchema = z.discriminatedUnion(
       requeridos: z.number().int().nonnegative(),
     }),
     z.object({
+      operacion: z.literal("announce_donation"),
+      intencion_id: identifierSchema,
+      cantidad_paquetes: z.number().int().positive(),
+      llegada_prevista: timestampSchema,
+    }),
+    z.object({
       operacion: z.enum(["create_center", "update_center"]),
       nombre: z.string().trim().min(1).max(160),
       estado: z.enum(["activo", "inactivo"]),

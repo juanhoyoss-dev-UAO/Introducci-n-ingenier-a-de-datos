@@ -99,13 +99,15 @@ export interface OperationalEventRecord {
     | "ajuste_inventario"
     | "actualizacion_necesidad"
     | "actualizacion_voluntariado"
+    | "anuncio_donacion"
     | "cambio_estado_centro";
   operacion:
     | "create_center"
     | "update_center"
     | "upsert_inventory"
     | "upsert_need"
-    | "upsert_volunteers";
+    | "upsert_volunteers"
+    | "announce_donation";
   centro_id: string;
   producto_id: string | null;
   sku_id: string | null;

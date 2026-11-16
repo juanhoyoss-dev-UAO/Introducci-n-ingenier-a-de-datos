@@ -101,6 +101,30 @@ function changeInventory(
 }
 
 function applyEvent(state: SnapshotBundle, event: TemporalEvent) {
+  if (event.tipo === "anuncio_donacion") {
+    if (
+      !event.sku_id ||
+      !hasCenter(state, event.centro_id) ||
+      !hasProduct(state, event.producto_id) ||
+      !hasPresentation(state, event.sku_id, event.producto_id) ||
+      state.expectedDonations.some(
+        (row) => row.intencion_id === event.payload.intencion_id,
+      )
+    ) {
+      return "referencia_invalida" as const;
+    }
+    state.expectedDonations.push({
+      snapshot_id: state.metadata.id,
+      intencion_id: event.payload.intencion_id,
+      centro_id: event.centro_id,
+      sku_id: event.sku_id,
+      cantidad_paquetes: event.payload.cantidad_paquetes,
+      llegada_prevista: event.payload.llegada_prevista,
+      estado: "pendiente",
+    });
+    return null;
+  }
+
   if (event.tipo === "recepcion_confirmada") {
     const donation = event.payload.intencion_id
       ? state.expectedDonations.find(

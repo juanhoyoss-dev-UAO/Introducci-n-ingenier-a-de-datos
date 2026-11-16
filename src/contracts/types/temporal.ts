@@ -18,6 +18,15 @@ interface TemporalEventBase {
 
 export type TemporalEvent =
   | (TemporalEventBase & {
+      tipo: "anuncio_donacion";
+      operacion: "announce_donation";
+      payload: {
+        intencion_id: string;
+        cantidad_paquetes: number;
+        llegada_prevista: string;
+      };
+    })
+  | (TemporalEventBase & {
       tipo: "recepcion_confirmada";
       operacion: "confirm_donation" | "direct_reception";
       payload: {

@@ -1,5 +1,38 @@
 # Bitácora técnica
 
+## 2026-11-16 - Bloque M6.5
+
+### Objetivo
+
+Construir una semana humanitaria ficticia, reproducible y temporalmente trazable para validar dashboard, inventarios, necesidades, donaciones, voluntariado y alertas antes de M7.
+
+### Implementación
+
+- Añadida una configuracion versionada con semilla fija, seis centros, 32 productos, 40 presentaciones y trazabilidad de fuentes.
+- Añadido un generador que valida en staging y publica una base inicial y una semana completa sin sobrescribir snapshots existentes.
+- Generados 352 eventos distribuidos en siete dias: 80 anuncios, 90 recepciones, 57 despachos, 84 evaluaciones de voluntariado, 42 necesidades y 7 actualizaciones de centro.
+- Ampliado el contrato temporal con anuncios de donacion pendientes; un anuncio no incrementa inventario y una recepcion lo aplica una sola vez.
+- Conservadas las diferencias entre ocurrencia y registro, incluidos 59 eventos registrados en una fecha posterior.
+- El visor temporal usa la fecha del snapshot como corte inicial, evitando tomar la fecha real del equipo para este escenario.
+- Documentadas fuentes, decisiones, resultados diarios, puntos de control y datos desconocidos en `docs/ESCENARIO_SEMANAL_M6_5.md`.
+
+### Verificaciones reales
+
+- `npm.cmd run scenario:weekly`: 352 eventos reproducibles; segunda ejecucion compatible con los archivos publicados.
+- `npm.cmd run test:unit`: 9 archivos, 67/67.
+- `npm.cmd run test:csv`: 3 archivos, 36/36.
+- `npx.cmd vitest run tests/integration/weekly-scenario.test.ts`: 5/5.
+- `npm.cmd run test:http`: 1 archivo, 23/23 fuera del aislamiento de sockets. Dos intentos previos no ejecutaron casos porque `/api/health` no era accesible dentro del sandbox.
+- `npm.cmd run lint`, `npm.cmd run typecheck` y `npm.cmd run build`: aprobados; 17 rutas/paginas.
+- No hubo inspeccion visual de navegador en esta sesion; la evidencia de integracion proviene de consultas HTTP reales y build de produccion.
+
+### Pendientes
+
+- Incorporar y perfilar el Excel cuando se entregue, sin reinterpretarlo como inventario de los centros.
+- Mantener ocupacion no calculable hasta contar con pesos y capacidades validados.
+- M7, controles Play/Pause e importacion desde interfaz no fueron iniciados.
+- No hacer commit, push, merge ni rebase sin autorizacion.
+
 ## 2026-11-15 - Bloque M5
 
 ### Objetivo

@@ -13,6 +13,7 @@
     "test:integration": "vitest run tests/integration",
     "test:csv": "vitest run tests/integration/csv-repository.test.ts tests/integration/csv-safety.test.ts tests/integration/csv-validation.test.ts",
     "test:http": "vitest run tests/http",
+    "scenario:weekly": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/generate-weekly-scenario.ts",
     "auth:hash": "node scripts/generate-admin-password-hash.mjs"
   },
   "dependencies": {

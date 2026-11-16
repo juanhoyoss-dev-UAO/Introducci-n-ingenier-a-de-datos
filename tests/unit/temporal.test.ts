@@ -123,6 +123,43 @@ describe("reconstrucción temporal M6", () => {
     expect(inventory(result)).toBe(15);
   });
 
+  it("incorpora un anuncio antes de confirmar su recepción", () => {
+    const announcement: TemporalEvent = {
+      ...reception(),
+      evento_id: "event-announcement",
+      operacion_id: "operation-announcement",
+      tipo: "anuncio_donacion",
+      operacion: "announce_donation",
+      ocurrido_en: "2026-11-15T08:30:00-05:00",
+      registrado_en: "2026-11-15T08:30:00-05:00",
+      orden: 0,
+      payload: {
+        intencion_id: "SIM-D001",
+        cantidad_paquetes: 5,
+        llegada_prevista: "2026-11-15T09:00:00-05:00",
+      },
+    };
+    const confirmation = reception({
+      operacion: "confirm_donation",
+      payload: { cantidad_paquetes: 4, intencion_id: "SIM-D001" },
+    });
+    const result = reconstructTemporalState(
+      baseBundle(),
+      [confirmation, announcement],
+      SCENARIO,
+      "2026-11-15T10:00:00-05:00",
+      "fisica",
+    );
+    expect(inventory(result)).toBe(14);
+    expect(result.estado.expectedDonations).toContainEqual(
+      expect.objectContaining({
+        intencion_id: "SIM-D001",
+        cantidad_paquetes: 5,
+        estado: "recibida",
+      }),
+    );
+  });
+
   it("no aplica una recepción posterior al corte", () => {
     const result = reconstructTemporalState(
       baseBundle(),

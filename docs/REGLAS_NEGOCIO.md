@@ -65,6 +65,18 @@ El evento conserva `ocurrido_en` y `registrado_en` para distinguir el hecho fís
 - Los identificadores de condición se forman de manera determinista por tipo, centro y sujeto. Una condición resuelta desaparece en la evaluación siguiente.
 - El orden es severidad, prioridad, centro, producto e identificador. Las alertas no mezclan snapshots, productos ni unidades y no suman donaciones pendientes al inventario confirmado.
 
+## Reconstruccion temporal M6 y escenario semanal M6.5
+
+- Toda reconstruccion comienza en `snapshot_base_id` y aplica eventos una sola vez; nunca suma inventarios completos de snapshots sucesivos.
+- La perspectiva fisica ordena y corta por `ocurrido_en`; la informativa usa `registrado_en`. Los empates se resuelven con orden, operacion e identificador deterministas.
+- `registrado_en` nunca puede ser anterior a `ocurrido_en`. Un registro posterior, incluso al dia siguiente, no cambia la hora fisica del hecho.
+- `anuncio_donacion` crea una intencion pendiente con centro, SKU, cantidad y llegada prevista. No modifica inventario.
+- Una recepcion asociada requiere que el anuncio exista en ese corte, incrementa paquetes exactamente una vez y cambia la intencion a `recibida`.
+- Las actualizaciones de voluntariado representan el total disponible y requerido en ese momento del turno; no se suman turnos ni se duplican personas.
+- Las necesidades son objetivos vigentes. No se renuevan por dia y solo cambian mediante un evento explicito.
+- El escenario M6.5 es completamente simulado, usa `America/Bogota` y no consulta el reloj del sistema para generar datos ni evaluar alertas historicas.
+- Capacidad permanece no calculable mientras falten pesos por presentacion y capacidad maxima por centro.
+
 ## Datos obligatorios de referencia
 
 En el snapshot A, `C01` tiene 10 botellas de 600 ml y 4 de 1.500 ml: 12.000 ml confirmados. Su objetivo es 20.000 ml, por lo que el déficit confirmado es 8.000 ml. La intención pendiente de 10 botellas de 600 ml equivale a 6.000 ml esperados y no reduce ese déficit confirmado.

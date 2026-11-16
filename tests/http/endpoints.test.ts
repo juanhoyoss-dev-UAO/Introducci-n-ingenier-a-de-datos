@@ -14,6 +14,9 @@ import {
 
 const SNAPSHOT_A = "10000000-0000-4000-8000-000000000001";
 const SNAPSHOT_B = "10000000-0000-4000-8000-000000000002";
+const WEEKLY_SCENARIO = "65000000-0000-4000-8000-000000000001";
+const WEEKLY_BASE = "65000000-0000-4000-8000-000000000002";
+const WEEKLY_FINAL = "65000000-0000-4000-8000-000000000003";
 const UNKNOWN_SNAPSHOT = "10000000-0000-4000-8000-000000000099";
 const ADMIN_USERNAME = "administrador-pruebas";
 
@@ -514,7 +517,7 @@ describe("HTTP real C2", () => {
     expect(body.error.code).toBe("FORBIDDEN");
   });
 
-  it("T05 permite al administrador consultar dos snapshots CSV", async () => {
+  it("T05 permite al administrador consultar los cuatro snapshots CSV", async () => {
     const [snapshots, detail] = await Promise.all([
       api<ApiSuccess<SnapshotResponse[]>>("/api/snapshots", {
         cookie: administratorCookie,
@@ -524,10 +527,12 @@ describe("HTTP real C2", () => {
       }),
     ]);
     expect(snapshots.response.status).toBe(200);
-    expect(snapshots.body.data).toHaveLength(2);
+    expect(snapshots.body.data).toHaveLength(4);
     expect(snapshots.body.data.map((snapshot) => snapshot.id).sort()).toEqual([
       SNAPSHOT_A,
       SNAPSHOT_B,
+      WEEKLY_BASE,
+      WEEKLY_FINAL,
     ]);
     expect(detail.response.status).toBe(200);
     expect(detail.body.data.id).toBe(SNAPSHOT_A);
@@ -1211,6 +1216,35 @@ describe("HTTP real C2", () => {
     expect(invalidPeriod.response.status).toBe(400);
     expect(invalidPeriod.body.error.code).toBe("INVALID_TEMPORAL_QUERY");
   });
+
+  it("M6.5 consulta la semana completa sin mezclar los snapshots A y B", async () => {
+    const cutoff = "2026-11-15T23:59:00-05:00";
+    const [temporal, dashboard] = await Promise.all([
+      api<ApiSuccess<TemporalResponse>>(
+        `/api/snapshots/${WEEKLY_FINAL}/temporal?escenarioId=${WEEKLY_SCENARIO}&perspectiva=fisica&corte=${encodeURIComponent(cutoff)}`,
+        { cookie: administratorCookie },
+      ),
+      api<ApiSuccess<DashboardResponse>>(
+        `/api/dashboard?snapshotId=${WEEKLY_FINAL}`,
+        { cookie: administratorCookie },
+      ),
+    ]);
+    expect(temporal.response.status, JSON.stringify(temporal.body)).toBe(200);
+    expect(temporal.body.data).toMatchObject({
+      referencia: {
+        snapshot_id: WEEKLY_FINAL,
+        escenario_id: WEEKLY_SCENARIO,
+        snapshot_base_id: WEEKLY_BASE,
+      },
+      completitud: { estado: "completa", limitaciones: [] },
+    });
+    expect(temporal.body.data.eventos).toHaveLength(352);
+    expect(temporal.body.data.reconstruccion.eventos_aplicados).toHaveLength(352);
+    expect(dashboard.response.status, JSON.stringify(dashboard.body)).toBe(200);
+    expect(dashboard.body.data.centros).toHaveLength(6);
+    expect(dashboard.body.data.centros[0]?.productos).toHaveLength(32);
+    expect(dashboard.body.data.donaciones_esperadas).toHaveLength(80);
+  }, 20_000);
 
   it("T09 rechaza alteración, firma o secreto incorrectos y expiración", async () => {
     const token = administratorCookie.slice(

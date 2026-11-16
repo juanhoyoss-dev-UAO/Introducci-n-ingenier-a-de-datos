@@ -172,6 +172,18 @@ function operationalEvents(
         },
       };
     }
+    if (payload.operacion === "announce_donation") {
+      return {
+        ...common,
+        tipo: "anuncio_donacion",
+        operacion: payload.operacion,
+        payload: {
+          intencion_id: payload.intencion_id,
+          cantidad_paquetes: payload.cantidad_paquetes,
+          llegada_prevista: payload.llegada_prevista,
+        },
+      };
+    }
     return {
       ...common,
       tipo: "cambio_estado_centro",

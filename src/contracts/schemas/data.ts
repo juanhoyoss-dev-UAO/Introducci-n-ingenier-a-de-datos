@@ -164,6 +164,7 @@ const operationalEventCsvRowBaseSchema = z
       "ajuste_inventario",
       "actualizacion_necesidad",
       "actualizacion_voluntariado",
+      "anuncio_donacion",
       "cambio_estado_centro",
     ]),
     operacion: z.enum([
@@ -172,6 +173,7 @@ const operationalEventCsvRowBaseSchema = z
       "upsert_inventory",
       "upsert_need",
       "upsert_volunteers",
+      "announce_donation",
     ]),
     centro_id: identifierSchema,
     producto_id: nullableTextSchema,
@@ -218,6 +220,7 @@ export const operationalEventCsvRowSchema =
       upsert_inventory: "ajuste_inventario",
       upsert_need: "actualizacion_necesidad",
       upsert_volunteers: "actualizacion_voluntariado",
+      announce_donation: "anuncio_donacion",
     }[row.operacion];
     if (row.tipo !== expectedType) {
       context.addIssue({

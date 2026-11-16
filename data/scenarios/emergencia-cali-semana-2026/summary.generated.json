@@ -1,0 +1,49 @@
+{
+  "simulated": true,
+  "seed": "redes-de-ayuda-m6.5-cali-2026-v1",
+  "products": 32,
+  "presentations": 40,
+  "centers": 6,
+  "events_total": 352,
+  "events_by_day": {
+    "2026-11-09": 46,
+    "2026-11-10": 52,
+    "2026-11-11": 54,
+    "2026-11-12": 53,
+    "2026-11-13": 54,
+    "2026-11-14": 53,
+    "2026-11-15": 40
+  },
+  "events_by_center": {
+    "C01": 64,
+    "C02": 58,
+    "C03": 57,
+    "C04": 61,
+    "C05": 56,
+    "C06": 56
+  },
+  "donation_announcements": 80,
+  "receptions_confirmed": 90,
+  "dispatches": 57,
+  "donations_pending_at_close": 10,
+  "donation_outcomes": {
+    "announced_received": 70,
+    "arrived_on_scheduled_time": 49,
+    "arrived_early": 7,
+    "arrived_late": 14,
+    "partial": 7,
+    "above_announced": 7,
+    "not_received_at_close": 10,
+    "received_without_announcement": 20
+  },
+  "registrations_next_day": 59,
+  "volunteer_evaluations": 84,
+  "need_updates": 42,
+  "temporal_completeness_expected": "completa",
+  "unknown_data": [
+    "pesos por presentacion",
+    "capacidades maximas por centro",
+    "contenido de presentaciones no declarado por fuentes",
+    "filas del Excel de referencia no disponible"
+  ]
+}

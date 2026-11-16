@@ -1,0 +1,7 @@
+snapshot_id,centro_id,nombre,estado,zona,coordinador_nombre
+65000000-0000-4000-8000-000000000003,C01,Centro Norte,activo,Norte - SIMULADO,Coordinacion Norte - SIMULADA
+65000000-0000-4000-8000-000000000003,C02,Centro Sur,activo,Sur - SIMULADO,Coordinacion Sur - SIMULADA
+65000000-0000-4000-8000-000000000003,C03,Centro Oriente,activo,Oriente - SIMULADO,Coordinacion Oriente - SIMULADA
+65000000-0000-4000-8000-000000000003,C04,Centro Occidente,activo,Occidente - SIMULADO,Coordinacion Logistica - SIMULADA
+65000000-0000-4000-8000-000000000003,C05,Centro Centro,activo,Centro - SIMULADO,Coordinacion Centro - SIMULADA
+65000000-0000-4000-8000-000000000003,C06,Centro de apoyo complementario,activo,Corredor complementario - SIMULADO,Coordinacion Complementaria - SIMULADA
