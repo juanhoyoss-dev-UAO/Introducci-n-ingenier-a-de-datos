@@ -19,14 +19,14 @@ La descripción técnica orienta, pero no sustituye revisar el código vigente.
 - Login de un administrador con scrypt.
 - Sesión HMAC en cookie HttpOnly.
 - Dashboard protegido con selector de snapshot y centro.
-- Resumen analítico, tablas operativas, actualización M3 y movimientos/recepciones M4.
+- Resumen analítico, tablas operativas, actualización M3, movimientos/recepciones M4 y alertas operativas M5.
 - Dos snapshots demostrativos.
 - API protegida de consulta y escritura por versiones operativas inmutables.
 - Repositorio CSV con validación y publicación interna segura.
 - Logger correlacionado mediante requestId.
 - Pruebas unitarias, CSV y HTTP.
 
-No afirmar que existen capacidad calculable, agregados horarios, importación, comparación de jornadas, traslados ejecutados o simulación interactiva.
+No afirmar que existen capacidad calculable, historial persistente de alertas, notificaciones externas, agregados horarios, importación, comparación de jornadas, traslados ejecutados o simulación interactiva.
 
 ## Arquitectura resumida
 

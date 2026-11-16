@@ -2,6 +2,11 @@ import type {
   DashboardIndicatorSummary,
   DashboardVisualizations,
 } from "@/contracts/types/analytics";
+import type {
+  AlertDonationInput,
+  AlertTemporalEvidence,
+} from "@/contracts/types/alerts";
+import { evaluateOperationalAlerts } from "@/domain/alerts";
 import {
   calculateCoveragePercentage,
   calculateDeficit,
@@ -17,6 +22,7 @@ import {
 } from "@/domain/transfers";
 import {
   getOperationsRepository,
+  type DashboardSource,
   type OperationsRepository,
 } from "@/server/repositories/operations";
 import { serverLog } from "@/server/observability/request-context";
@@ -25,10 +31,17 @@ import { ApiError } from "./errors";
 export async function getDashboard(
   snapshotId: string,
   repository: OperationsRepository = getOperationsRepository(),
+  evaluatedAt: string = new Date().toISOString(),
+  options?: {
+    source?: DashboardSource;
+    referencia_tipo?: "snapshot" | "escenario";
+    referencia_id?: string;
+  },
 ) {
   const startedAt = performance.now();
   serverLog("INFO", "SERVICE", "Calculando indicadores");
-  const source = await repository.getDashboardSource(snapshotId);
+  const source =
+    options?.source ?? (await repository.getDashboardSource(snapshotId));
   if (!source.snapshot) {
     throw new ApiError(404, "SNAPSHOT_NOT_FOUND", "El snapshot no existe.");
   }
@@ -200,6 +213,87 @@ export async function getDashboard(
     })),
   };
 
+  const centerById = new Map(
+    centers.map((center) => [center.centro_id, center]),
+  );
+  const productById = new Map(
+    source.products.map((product) => [product.producto_id, product]),
+  );
+  const donations: AlertDonationInput[] = source.expectedDonations.flatMap(
+    (donation) => {
+      const center = centerById.get(donation.centro_id);
+      const presentation = presentationBySku.get(donation.sku_id);
+      const product = presentation
+        ? productById.get(presentation.producto_id)
+        : undefined;
+      if (!center || !product) {
+        return [];
+      }
+      return [
+        {
+          intencion_id: donation.intencion_id,
+          centro_id: center.centro_id,
+          centro_nombre: center.nombre,
+          producto_id: product.producto_id,
+          producto_nombre: product.nombre,
+          llegada_prevista: donation.llegada_prevista,
+          estado: donation.estado,
+        },
+      ];
+    },
+  );
+  const temporalEvidence: AlertTemporalEvidence[] = source.movements.flatMap(
+    (movement) => {
+      const centerId =
+        movement.tipo === "despacho"
+          ? movement.centro_origen_id
+          : movement.centro_destino_id;
+      const center = centerId ? centerById.get(centerId) : undefined;
+      const product = productById.get(movement.producto_id);
+      if (!center || !product) {
+        return [];
+      }
+      return [
+        {
+          entidad: "inventario" as const,
+          centro_id: center.centro_id,
+          centro_nombre: center.nombre,
+          producto_id: product.producto_id,
+          producto_nombre: product.nombre,
+          actualizado_en: movement.registrado_en,
+        },
+      ];
+    },
+  );
+  const alertas = evaluateOperationalAlerts({
+    referencia_tipo: options?.referencia_tipo ?? "snapshot",
+    referencia_id: options?.referencia_id ?? source.snapshot.id,
+    evaluado_en: evaluatedAt,
+    centros: centers.map((center) => ({
+      centro_id: center.centro_id,
+      centro_nombre: center.nombre,
+      voluntarios_disponibles: center.voluntarios.disponibles,
+      voluntarios_requeridos: center.voluntarios.requeridos,
+      capacidad_almacenamiento: center.capacidad_almacenamiento,
+      productos: center.productos.map((product) => ({
+        producto_id: product.producto_id,
+        producto_nombre: product.nombre,
+        unidad_base: product.unidad_base,
+        inventario_confirmado_unidad_base:
+          product.inventario_confirmado_unidad_base,
+        objetivo_unidad_base: product.objetivo_unidad_base,
+        deficit_confirmado_unidad_base:
+          product.deficit_confirmado_unidad_base,
+        cobertura_porcentaje: product.cobertura_porcentaje,
+        excedente_transferible_unidad_base:
+          product.excedente_transferible_unidad_base,
+        prioridad: product.prioridad,
+      })),
+    })),
+    donaciones: donations,
+    evidencia_temporal: temporalEvidence,
+  });
+
   const result = {
     snapshot: source.snapshot,
     centros: centers,
@@ -207,12 +301,14 @@ export async function getDashboard(
     visualizaciones,
     donaciones_esperadas: source.expectedDonations,
     movimientos: source.movements,
+    alertas,
     candidatos_traslado: recommendTransfers(balances, source.travelTimes),
   };
   serverLog("OK", "SERVICE", "Indicadores calculados", {
     centers: result.centros.length,
     durationMs: Math.round(performance.now() - startedAt),
     expectedDonations: result.donaciones_esperadas.length,
+    alerts: result.alertas.total,
     transferCandidates: result.candidatos_traslado.length,
   });
   return result;

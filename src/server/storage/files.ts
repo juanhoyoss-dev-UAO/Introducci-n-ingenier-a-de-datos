@@ -6,6 +6,7 @@ import {
   expectedDonationCsvRowSchema,
   inventoryCsvRowSchema,
   movementCsvRowSchema,
+  operationalEventCsvRowSchema,
   needCsvRowSchema,
   presentationCsvRowSchema,
   productCsvRowSchema,
@@ -145,6 +146,7 @@ async function readSnapshotBundleData(
     travelTimesText,
     expectedDonationsText,
     movementsText,
+    operationalEventsText,
   ] = await Promise.all([
     readTextFile(snapshotDirectory, CSV_FILE_NAMES.centers),
     readTextFile(snapshotDirectory, CSV_FILE_NAMES.products),
@@ -155,6 +157,10 @@ async function readSnapshotBundleData(
     readTextFile(snapshotDirectory, CSV_FILE_NAMES.travelTimes),
     readTextFile(snapshotDirectory, CSV_FILE_NAMES.expectedDonations),
     readOptionalTextFile(snapshotDirectory, CSV_FILE_NAMES.movements),
+    readOptionalTextFile(
+      snapshotDirectory,
+      CSV_FILE_NAMES.operationalEvents,
+    ),
   ]);
 
   return validateSnapshotBundle({
@@ -195,6 +201,14 @@ async function readSnapshotBundleData(
             CSV_COLUMNS.movements,
             movementCsvRowSchema,
           ),
+    operationalEvents:
+      operationalEventsText === null
+        ? []
+        : parseCsvRows(
+            operationalEventsText,
+            CSV_COLUMNS.operationalEvents,
+            operationalEventCsvRowSchema,
+          ),
   });
 }
 
@@ -222,6 +236,7 @@ export async function readSnapshotBundle(
           CSV_FILE_NAMES.travelTimes,
           CSV_FILE_NAMES.expectedDonations,
           CSV_FILE_NAMES.movements,
+          CSV_FILE_NAMES.operationalEvents,
         ].join(","),
         records: [
           `metadata.json:1`,
@@ -234,6 +249,7 @@ export async function readSnapshotBundle(
           `${CSV_FILE_NAMES.travelTimes}:${bundle.travelTimes.length}`,
           `${CSV_FILE_NAMES.expectedDonations}:${bundle.expectedDonations.length}`,
           `${CSV_FILE_NAMES.movements}:${bundle.movements.length}`,
+          `${CSV_FILE_NAMES.operationalEvents}:${bundle.operationalEvents.length}`,
         ].join(","),
         result: "ok",
         snapshot: expectedSnapshotId,
@@ -302,5 +318,12 @@ export async function writeSnapshotBundle(
   await writeExclusive(
     resolveWithin(snapshotDirectory, CSV_FILE_NAMES.movements),
     stringifyCsvRows(bundle.movements, CSV_COLUMNS.movements),
+  );
+  await writeExclusive(
+    resolveWithin(snapshotDirectory, CSV_FILE_NAMES.operationalEvents),
+    stringifyCsvRows(
+      bundle.operationalEvents,
+      CSV_COLUMNS.operationalEvents,
+    ),
   );
 }

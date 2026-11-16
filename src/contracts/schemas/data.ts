@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { operationalTemporalPayloadSchema } from "./temporal";
+
 const canonicalNumberPattern = /^[+-]?(?:\d+(?:\.\d+)?|\.\d+)$/;
 const uuidSchema = z.string().uuid().transform((value) => value.toLowerCase());
 
@@ -43,6 +45,9 @@ export const snapshotMetadataSchema = z
     nombre: requiredTextSchema,
     created_at: timestampSchema,
     descripcion: nullableTextSchema,
+    escenario_id: uuidSchema.optional(),
+    snapshot_origen_id: uuidSchema.optional(),
+    snapshot_base_id: uuidSchema.optional(),
   })
   .strict();
 
@@ -148,6 +153,81 @@ export const movementCsvRowSchema = z
   })
   .strict();
 
+const operationalEventCsvRowBaseSchema = z
+  .object({
+    snapshot_id: uuidSchema,
+    evento_id: uuidSchema,
+    operacion_id: uuidSchema,
+    escenario_id: uuidSchema,
+    snapshot_origen_id: uuidSchema,
+    tipo: z.enum([
+      "ajuste_inventario",
+      "actualizacion_necesidad",
+      "actualizacion_voluntariado",
+      "cambio_estado_centro",
+    ]),
+    operacion: z.enum([
+      "create_center",
+      "update_center",
+      "upsert_inventory",
+      "upsert_need",
+      "upsert_volunteers",
+    ]),
+    centro_id: identifierSchema,
+    producto_id: nullableTextSchema,
+    sku_id: nullableTextSchema,
+    ocurrido_en: timestampSchema,
+    registrado_en: timestampSchema,
+    orden: nonNegativeIntegerSchema,
+    payload_json: requiredTextSchema,
+  })
+  .strict();
+
+export const operationalEventCsvRowSchema =
+  operationalEventCsvRowBaseSchema.superRefine((row, context) => {
+    let payload: unknown;
+    try {
+      payload = JSON.parse(row.payload_json);
+    } catch {
+      context.addIssue({
+        code: "custom",
+        path: ["payload_json"],
+        message: "El payload del evento debe contener JSON válido.",
+      });
+      return;
+    }
+    const parsed = operationalTemporalPayloadSchema.safeParse(payload);
+    if (!parsed.success) {
+      context.addIssue({
+        code: "custom",
+        path: ["payload_json"],
+        message: "El payload del evento no corresponde al contrato temporal.",
+      });
+      return;
+    }
+    if (parsed.data.operacion !== row.operacion) {
+      context.addIssue({
+        code: "custom",
+        path: ["operacion"],
+        message: "La operación no coincide con el payload temporal.",
+      });
+    }
+    const expectedType = {
+      create_center: "cambio_estado_centro",
+      update_center: "cambio_estado_centro",
+      upsert_inventory: "ajuste_inventario",
+      upsert_need: "actualizacion_necesidad",
+      upsert_volunteers: "actualizacion_voluntariado",
+    }[row.operacion];
+    if (row.tipo !== expectedType) {
+      context.addIssue({
+        code: "custom",
+        path: ["tipo"],
+        message: "El tipo de evento no corresponde a la operación.",
+      });
+    }
+  });
+
 const snapshotBundleBaseSchema = z
   .object({
     metadata: snapshotMetadataSchema,
@@ -160,6 +240,7 @@ const snapshotBundleBaseSchema = z
     travelTimes: z.array(travelTimeCsvRowSchema),
     expectedDonations: z.array(expectedDonationCsvRowSchema),
     movements: z.array(movementCsvRowSchema),
+    operationalEvents: z.array(operationalEventCsvRowSchema),
   })
   .strict();
 
@@ -220,6 +301,7 @@ export const snapshotBundleSchema = snapshotBundleBaseSchema.superRefine(
       ["travelTimes", bundle.travelTimes],
       ["expectedDonations", bundle.expectedDonations],
       ["movements", bundle.movements],
+      ["operationalEvents", bundle.operationalEvents],
     ];
 
     for (const [collection, rows] of collections) {
@@ -295,6 +377,20 @@ export const snapshotBundleSchema = snapshotBundleBaseSchema.superRefine(
       (row) => row.movimiento_id,
       "movements",
       "movimiento",
+      context,
+    );
+    reportDuplicate(
+      bundle.operationalEvents,
+      (row) => row.evento_id,
+      "operationalEvents",
+      "evento operativo",
+      context,
+    );
+    reportDuplicate(
+      bundle.operationalEvents,
+      (row) => row.operacion_id,
+      "operationalEvents",
+      "operación temporal",
       context,
     );
     reportDuplicate(
@@ -482,6 +578,47 @@ export const snapshotBundleSchema = snapshotBundleBaseSchema.superRefine(
         });
       }
     });
+
+    bundle.operationalEvents.forEach((row, index) => {
+      reportMissingReference(
+        centerIds.has(row.centro_id),
+        "operationalEvents",
+        index,
+        "centro_id",
+        `centro ${row.centro_id}`,
+        context,
+      );
+      if (row.producto_id) {
+        reportMissingReference(
+          productIds.has(row.producto_id),
+          "operationalEvents",
+          index,
+          "producto_id",
+          `producto ${row.producto_id}`,
+          context,
+        );
+      }
+      if (row.sku_id) {
+        reportMissingReference(
+          skuIds.has(row.sku_id),
+          "operationalEvents",
+          index,
+          "sku_id",
+          `SKU ${row.sku_id}`,
+          context,
+        );
+      }
+      if (
+        bundle.metadata.escenario_id &&
+        row.escenario_id !== bundle.metadata.escenario_id
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["operationalEvents", index, "escenario_id"],
+          message: "El evento no pertenece al escenario del snapshot.",
+        });
+      }
+    });
   },
 );
 
@@ -501,4 +638,7 @@ export type ExpectedDonationCsvRow = z.infer<
   typeof expectedDonationCsvRowSchema
 >;
 export type MovementCsvRow = z.infer<typeof movementCsvRowSchema>;
+export type OperationalEventCsvRow = z.infer<
+  typeof operationalEventCsvRowSchema
+>;
 export type SnapshotBundle = z.infer<typeof snapshotBundleSchema>;

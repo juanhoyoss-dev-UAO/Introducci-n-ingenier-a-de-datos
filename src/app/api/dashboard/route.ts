@@ -10,8 +10,12 @@ export async function GET(request: Request) {
     const snapshotId = parseSnapshotId(
       new URL(request.url).searchParams.get("snapshotId"),
     );
-    const dashboard = await getDashboard(snapshotId);
-    return successResponse(dashboard, { snapshot_id: snapshotId });
+    const evaluatedAt = new Date().toISOString();
+    const dashboard = await getDashboard(snapshotId, undefined, evaluatedAt);
+    return successResponse(dashboard, {
+      snapshot_id: snapshotId,
+      evaluado_en: evaluatedAt,
+    });
   });
 }
 

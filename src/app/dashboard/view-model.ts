@@ -38,6 +38,9 @@ export interface OperationalSummary {
   centrosConNecesidades: number;
   donacionesPendientes: number;
   centrosConVoluntariosFaltantes: number;
+  alertasActivas: number;
+  alertasCriticas: number;
+  centrosQueRequierenAtencion: number;
   atencion: OperationalAttention | null;
 }
 
@@ -144,6 +147,9 @@ export function deriveOperationalSummary(
   const centers = bundle.dashboard.centros.filter((center) =>
     matchesCenter(center.centro_id, filter),
   );
+  const alerts = bundle.dashboard.alertas.alertas.filter((alert) =>
+    matchesCenter(alert.centro_id, filter),
+  );
   const attention = centers
     .map((center) => ({
       centro_id: center.centro_id,
@@ -188,6 +194,12 @@ export function deriveOperationalSummary(
     centrosConVoluntariosFaltantes: centers.filter(
       (center) => center.voluntarios.faltantes > 0,
     ).length,
+    alertasActivas: alerts.length,
+    alertasCriticas: alerts.filter((alert) => alert.severidad === "critica")
+      .length,
+    centrosQueRequierenAtencion: new Set(
+      alerts.map((alert) => alert.centro_id),
+    ).size,
     atencion: attention,
   };
 }

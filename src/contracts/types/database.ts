@@ -3,6 +3,9 @@ export interface SnapshotRecord {
   nombre: string;
   created_at: string;
   descripcion: string | null;
+  escenario_id?: string;
+  snapshot_origen_id?: string;
+  snapshot_base_id?: string;
 }
 
 export interface CenterRecord {
@@ -84,6 +87,32 @@ export interface MovementRecord {
   intencion_id: string | null;
   snapshot_origen_id: string;
   cantidad_anunciada_paquetes: number | null;
+}
+
+export interface OperationalEventRecord {
+  snapshot_id: string;
+  evento_id: string;
+  operacion_id: string;
+  escenario_id: string;
+  snapshot_origen_id: string;
+  tipo:
+    | "ajuste_inventario"
+    | "actualizacion_necesidad"
+    | "actualizacion_voluntariado"
+    | "cambio_estado_centro";
+  operacion:
+    | "create_center"
+    | "update_center"
+    | "upsert_inventory"
+    | "upsert_need"
+    | "upsert_volunteers";
+  centro_id: string;
+  producto_id: string | null;
+  sku_id: string | null;
+  ocurrido_en: string;
+  registrado_en: string;
+  orden: number;
+  payload_json: string;
 }
 
 export interface SimulationRecord {

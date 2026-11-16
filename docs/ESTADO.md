@@ -1,5 +1,19 @@
 # Estado del proyecto
 
+## Checkpoint M5
+
+- Estado: motor puro de alertas y centro de monitoreo integrados; simulación temporal e historial persistente de alertas no iniciados.
+- Evaluación: cada cálculo recibe `evaluado_en` explícito y no ambiguo; el dominio no consulta el reloj del sistema. La aplicación normal inyecta la hora desde el servidor y la interfaz la presenta en `America/Bogota`.
+- Reglas: cobertura por límites 30/70/100, voluntariado faltante, donaciones pendientes con 60 minutos de tolerancia, información desactualizada después de cuatro horas con evidencia válida, capacidad 85/95/>100 y excedente transferible informativo.
+- Consistencia: las alertas reutilizan indicadores M1 y movimientos M4, no suman donaciones pendientes al inventario, no mezclan snapshots ni unidades y desaparecen al dejar de cumplirse.
+- Identidad: los identificadores dependen de tipo, centro y sujeto operativo, no de UUID aleatorio ni de la hora de consulta; el orden es estable por severidad, prioridad, centro, producto e identificador.
+- API: `/api/dashboard` conserva sus campos y añade resumen, distribución y detalle de alertas; sigue protegido por sesión administrativa y no publica datos.
+- Interfaz: nueva pestaña “Alertas operativas”, filtros por centro/severidad/tipo, estado vacío, navegación contextual y tres indicadores nuevos en el resumen.
+- Pruebas M5: unitarias 47/47, CSV 34/34, HTTP 20/20, lint, typecheck y build aprobados. Una corrida HTTP anterior aprobó 19/20 por esperar un nombre de error distinto; se ajustó la prueba al contrato real `UNAUTHENTICATED` sin modificar autenticación.
+- Verificación visual: snapshots A/B, filtros, estado vacío y responsive comprobados. Tras confirmar D01 en runtime aislado, las alertas pasaron de 15 a 14 y agua C01 cambió de 60 %/importante a 90 %/moderado; consola sin errores.
+- Evidencias: `output/screenshots/M5-alerta-recalculada.png`, `output/screenshots/M5-alertas-responsive.png` y `output/pdf/INFORME_M5.pdf`.
+- Rama: `feature/admin-inspector`; commit de partida `1181a99`; M5 permanece sin commit, push ni merge.
+
 ## Checkpoint M4
 
 - Estado: recepciones, confirmación de donaciones, despachos e historial de movimientos implementados; simulación temporal no iniciada.

@@ -12,6 +12,12 @@ export function MetricCards({ summary }: { summary: OperationalSummary }) {
       label: "Con personal faltante",
       value: summary.centrosConVoluntariosFaltantes,
     },
+    { label: "Alertas activas", value: summary.alertasActivas },
+    { label: "Alertas críticas", value: summary.alertasCriticas },
+    {
+      label: "Centros con atención",
+      value: summary.centrosQueRequierenAtencion,
+    },
   ];
 
   return (

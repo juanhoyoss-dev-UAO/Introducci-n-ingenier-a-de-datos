@@ -52,6 +52,19 @@ El evento conserva `ocurrido_en` y `registrado_en` para distinguir el hecho fís
 - Los movimientos se ordenan por `ocurrido_en` y UUID. Conteo de movimientos y suma de paquetes son métricas distintas.
 - Los traslados ejecutados todavía no están habilitados; las recomendaciones existentes continúan siendo informativas.
 
+## Alertas operativas M5
+
+- El motor recibe `evaluado_en` explícito con zona u offset; no consulta `Date.now()` ni sustituye esa hora por la del snapshot.
+- Cobertura menor a 30 % es crítica; desde 30 % y menor a 70 % es importante; desde 70 % y menor a 100 % es moderada; 100 % o más no produce alerta de déficit. Objetivos cero tampoco generan alerta.
+- La prioridad `1 = alta` interviene en el orden operativo y en la explicación, pero no crea una segunda alerta ni cambia la banda de cobertura del mismo centro/producto.
+- Hay alerta de voluntariado cuando disponibles es menor que requeridos y el valor observado son las personas faltantes.
+- Una donación pendiente se considera retrasada sólo cuando la evaluación supera su llegada prevista más 60 minutos. Recibidas y canceladas no generan retraso.
+- Información desactualizada requiere una fecha válida de actualización de la entidad y más de 240 minutos. Sin evidencia se informa temporalidad desconocida, no ocupación o antigüedad inventada.
+- Capacidad calculable desde 85 % genera advertencia, desde 95 % es crítica y mayor a 100 % indica sobrecapacidad. Capacidad no calculable no equivale a cero.
+- Excedente transferible positivo puede generar una alerta informativa; continúa siendo recomendación y nunca una orden automática de traslado.
+- Los identificadores de condición se forman de manera determinista por tipo, centro y sujeto. Una condición resuelta desaparece en la evaluación siguiente.
+- El orden es severidad, prioridad, centro, producto e identificador. Las alertas no mezclan snapshots, productos ni unidades y no suman donaciones pendientes al inventario confirmado.
+
 ## Datos obligatorios de referencia
 
 En el snapshot A, `C01` tiene 10 botellas de 600 ml y 4 de 1.500 ml: 12.000 ml confirmados. Su objetivo es 20.000 ml, por lo que el déficit confirmado es 8.000 ml. La intención pendiente de 10 botellas de 600 ml equivale a 6.000 ml esperados y no reduce ese déficit confirmado.

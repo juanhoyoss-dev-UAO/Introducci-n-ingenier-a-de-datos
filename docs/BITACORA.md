@@ -1,5 +1,41 @@
 # Bitácora técnica
 
+## 2026-11-15 - Bloque M5
+
+### Objetivo
+
+Transformar los indicadores consolidados y movimientos confirmados en alertas operativas reproducibles, consultables desde el dashboard y preparadas para recibir una hora ficticia en M7.
+
+### Implementación
+
+- Añadidos contratos tipados para estado de evaluación, umbrales, alertas, agregados por severidad/centro/tipo e información temporal desconocida.
+- Añadido un motor puro sin reloj interno, con identificadores deterministas, deduplicación y orden estable.
+- Centralizados los umbrales 30/70/100 de cobertura, 60 minutos para donaciones, 240 minutos para desactualización y 85/95/>100 para capacidad.
+- La prioridad de necesidades ordena la atención sin contradecir la banda de cobertura: C01 con 60 % permanece como déficit importante.
+- La evidencia temporal proviene de `registrado_en` de movimientos M4; si no existe, se informa como desconocida y no se fabrica una alerta.
+- `/api/dashboard` añade alertas sin cambiar sus campos anteriores, conserva autenticación administrativa y recibe una hora de evaluación generada en el servidor.
+- Añadida la pestaña “Alertas operativas” con resumen, filtros, acciones sugeridas, navegación contextual, estado vacío y diseño responsive.
+- Añadidos al Resumen operativo los totales de alertas activas, críticas y centros con atención.
+
+### Verificaciones reales
+
+- `npm.cmd run test:unit`: 7 archivos, 47/47.
+- `npm.cmd run test:csv`: 3 archivos, 34/34.
+- `npm.cmd run test:http`: 1 archivo, 20/20 en repetición final. La primera corrida M5 aprobó 19/20 y reveló que el contrato real usa `UNAUTHENTICATED`; se corrigió solamente la expectativa.
+- `npm.cmd run lint`: aprobado.
+- `npm.cmd run typecheck`: aprobado en ejecución aislada. Una corrida previa paralela al build falló porque ambos procesos regeneraron `.next/types`; no fue un fallo de código.
+- `npm.cmd run build`: aprobado; 16 rutas/páginas.
+- Navegador: snapshot A con 15 alertas, snapshot B con 5, filtros y estado vacío comprobados. Después de confirmar D01, la versión nueva tuvo 14 alertas, eliminó el retraso de D01 y cambió agua C01 de 60 %/importante a 90 %/moderado.
+- Responsive: viewport de 390 px sin desbordamiento del documento; consola del navegador sin errores.
+
+### Pendientes
+
+- No existe almacenamiento histórico independiente, reconocimiento de alertas ni notificación externa.
+- Capacidad seguirá sin alertas en los datos actuales mientras falten capacidad máxima y pesos validados.
+- M6 puede agregar análisis temporal sobre `ocurrido_en`, `registrado_en` y `evaluado_en`; M7 puede reutilizar el motor pasando la hora simulada.
+- El runtime aislado de QA fue eliminado; no se tocaron snapshots demostrativos.
+- No hacer commit, push ni merge sin autorización.
+
 ## 2026-11-15 - Bloque M4
 
 ### Objetivo

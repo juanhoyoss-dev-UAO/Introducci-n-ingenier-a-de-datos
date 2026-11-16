@@ -7,9 +7,11 @@ import type { OperationalUpdate } from "@/contracts/schemas/operational-updates"
 import type { MovementOperation } from "@/contracts/schemas/movement-operations";
 import { logger } from "@/lib/logger";
 import { AdministrativeEditor } from "./components/administrative-editor";
+import { AlertCenter } from "./components/alert-center";
 import { DashboardStatus } from "./components/dashboard-status";
 import { OperationalSummary } from "./components/operational-summary";
 import { MovementEditor } from "./components/movement-editor";
+import { TemporalEvolution } from "./components/temporal-evolution";
 import {
   centerRows,
   donationRows,
@@ -39,6 +41,8 @@ import type {
 
 const TABS: ReadonlyArray<{ id: DashboardTab; label: string }> = [
   { id: "resumen", label: "Resumen operativo" },
+  { id: "alertas", label: "Alertas operativas" },
+  { id: "temporal", label: "Evolución temporal" },
   { id: "centros", label: "Centros" },
   { id: "inventario", label: "Inventario" },
   { id: "necesidades", label: "Necesidades" },
@@ -548,6 +552,34 @@ export default function DashboardClient({
           centerFilter={centerFilter}
           onOpenTab={setActiveTab}
           productId={productFilter}
+        />
+      );
+    }
+
+    if (activeTab === "alertas") {
+      return (
+        <AlertCenter
+          centers={bundle.centers}
+          evaluation={bundle.dashboard.alertas}
+          initialCenterFilter={centerFilter}
+          key={`${bundle.snapshot.id}-${centerFilter}`}
+          onNavigate={(tab, centerId) => {
+            setCenterFilter(centerId);
+            setActiveTab(tab);
+          }}
+        />
+      );
+    }
+
+    if (activeTab === "temporal") {
+      return (
+        <TemporalEvolution
+          centers={bundle.centers}
+          initialCenterFilter={centerFilter}
+          initialProductId={productFilter}
+          key={`${bundle.snapshot.id}-${centerFilter}-${productFilter}`}
+          products={bundle.products}
+          snapshot={bundle.snapshot}
         />
       );
     }

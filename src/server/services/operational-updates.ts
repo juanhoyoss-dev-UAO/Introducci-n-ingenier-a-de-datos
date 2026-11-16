@@ -165,11 +165,16 @@ function createOperationalVersion(
   const sourceId = source.metadata.id;
   const nextId = randomUUID();
   const createdAt = now.toISOString();
+  const scenarioId = source.metadata.escenario_id ?? sourceId;
+  const baseSnapshotId = source.metadata.snapshot_base_id ?? sourceId;
   next.metadata = {
     id: nextId,
     nombre: `${source.metadata.nombre} · versión operativa`,
     created_at: createdAt,
     descripcion: `Versión operativa derivada del snapshot ${sourceId}.`,
+    escenario_id: scenarioId,
+    snapshot_origen_id: sourceId,
+    snapshot_base_id: baseSnapshotId,
   };
 
   for (const collection of [
@@ -182,6 +187,7 @@ function createOperationalVersion(
     next.travelTimes,
     next.expectedDonations,
     next.movements,
+    next.operationalEvents,
   ]) {
     for (const row of collection) {
       row.snapshot_id = nextId;
@@ -192,6 +198,78 @@ function createOperationalVersion(
   updateInventory(next, update);
   updateNeed(next, update);
   updateVolunteers(next, update);
+  const eventId = randomUUID();
+  const common = {
+    snapshot_id: nextId,
+    evento_id: eventId,
+    operacion_id: nextId,
+    escenario_id: scenarioId,
+    snapshot_origen_id: sourceId,
+    centro_id: update.values.centro_id,
+    ocurrido_en: createdAt,
+    registrado_en: createdAt,
+    orden: source.movements.length + source.operationalEvents.length + 1,
+  };
+  if (update.operation === "upsert_inventory") {
+    next.operationalEvents.push({
+      ...common,
+      tipo: "ajuste_inventario",
+      operacion: update.operation,
+      producto_id: update.values.producto_id,
+      sku_id: update.values.sku_id,
+      payload_json: JSON.stringify({
+        operacion: update.operation,
+        cantidad_paquetes: update.values.cantidad_paquetes,
+      }),
+    });
+  } else if (update.operation === "upsert_need") {
+    const need = next.needs.find(
+      (row) =>
+        row.centro_id === update.values.centro_id &&
+        row.producto_id === update.values.producto_id,
+    );
+    next.operationalEvents.push({
+      ...common,
+      tipo: "actualizacion_necesidad",
+      operacion: update.operation,
+      producto_id: update.values.producto_id,
+      sku_id: null,
+      payload_json: JSON.stringify({
+        operacion: update.operation,
+        objetivo_unidad_base: update.values.objetivo_unidad_base,
+        reserva_unidad_base: need?.reserva_unidad_base ?? 0,
+        prioridad: update.values.prioridad,
+      }),
+    });
+  } else if (update.operation === "upsert_volunteers") {
+    next.operationalEvents.push({
+      ...common,
+      tipo: "actualizacion_voluntariado",
+      operacion: update.operation,
+      producto_id: null,
+      sku_id: null,
+      payload_json: JSON.stringify({
+        operacion: update.operation,
+        disponibles: update.values.disponibles,
+        requeridos: update.values.requeridos,
+      }),
+    });
+  } else {
+    next.operationalEvents.push({
+      ...common,
+      tipo: "cambio_estado_centro",
+      operacion: update.operation,
+      producto_id: null,
+      sku_id: null,
+      payload_json: JSON.stringify({
+        operacion: update.operation,
+        nombre: update.values.nombre,
+        estado: update.values.estado,
+        zona: update.values.zona,
+        coordinador_nombre: update.values.coordinador_nombre,
+      }),
+    });
+  }
   return snapshotBundleSchema.parse(next);
 }
 

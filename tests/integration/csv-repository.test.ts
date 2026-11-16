@@ -7,6 +7,7 @@ import { CsvOperationsRepository } from "@/server/repositories/operations";
 import { getDashboard } from "@/server/services/dashboard";
 import { applyMovementOperation } from "@/server/services/movement-operations";
 import { applyOperationalUpdate } from "@/server/services/operational-updates";
+import { getTemporalAnalysis } from "@/server/services/temporal";
 import {
   createTempDataRoots,
   loadDemoBundle,
@@ -307,9 +308,10 @@ describe("repositorio CSV", () => {
         demoRoot: PROJECT_DEMO_ROOT,
         runtimeRoot: roots.runtimeRoot,
       });
-      const [original, operational] = await Promise.all([
+      const [original, operational, operationalBundle] = await Promise.all([
         getDashboard(SNAPSHOT_A, readerAfterRestart),
         getDashboard(result.snapshot.id, readerAfterRestart),
+        readerAfterRestart.getSnapshotBundle(result.snapshot.id),
       ]);
       const originalWater = original.centros
         .find((center) => center.centro_id === "C01")
@@ -337,6 +339,21 @@ describe("repositorio CSV", () => {
           necesidad_vigente: 20_000,
         }),
       );
+      expect(operationalBundle?.metadata).toMatchObject({
+        escenario_id: SNAPSHOT_A,
+        snapshot_origen_id: SNAPSHOT_A,
+        snapshot_base_id: SNAPSHOT_A,
+      });
+      expect(operationalBundle?.operationalEvents).toHaveLength(1);
+      expect(operationalBundle?.operationalEvents[0]).toMatchObject({
+        tipo: "ajuste_inventario",
+        operacion: "upsert_inventory",
+        centro_id: "C01",
+        producto_id: "P01",
+        sku_id: "AGUA-600",
+        ocurrido_en: "2026-11-15T12:00:00.000Z",
+        registrado_en: "2026-11-15T12:00:00.000Z",
+      });
     } finally {
       await roots.cleanup();
     }
@@ -533,10 +550,11 @@ describe("repositorio CSV", () => {
         demoRoot: PROJECT_DEMO_ROOT,
         runtimeRoot: roots.runtimeRoot,
       });
-      const [inventory, movements, originalInventory] = await Promise.all([
+      const [inventory, movements, originalInventory, bundle] = await Promise.all([
         readerAfterRestart.listInventory(result.snapshot.id),
         readerAfterRestart.listMovements(result.snapshot.id),
         readerAfterRestart.listInventory(SNAPSHOT_A),
+        readerAfterRestart.getSnapshotBundle(result.snapshot.id),
       ]);
 
       expect(result.idempotent).toBe(false);
@@ -563,6 +581,147 @@ describe("repositorio CSV", () => {
         snapshot_origen_id: SNAPSHOT_A,
         intencion_id: null,
       });
+      expect(bundle?.metadata).toMatchObject({
+        escenario_id: SNAPSHOT_A,
+        snapshot_origen_id: SNAPSHOT_A,
+        snapshot_base_id: SNAPSHOT_A,
+      });
+      expect(bundle?.operationalEvents).toEqual([]);
+    } finally {
+      await roots.cleanup();
+    }
+  });
+
+  it("M6 reconstruye perspectivas física e informativa sin duplicar M4", async () => {
+    const roots = await createTempDataRoots();
+    try {
+      const repository = new CsvOperationsRepository({
+        demoRoot: PROJECT_DEMO_ROOT,
+        runtimeRoot: roots.runtimeRoot,
+      });
+      const adjustment = await applyOperationalUpdate(
+        SNAPSHOT_A,
+        {
+          operation: "upsert_inventory",
+          values: {
+            centro_id: "C01",
+            producto_id: "P01",
+            sku_id: "AGUA-600",
+            cantidad_paquetes: 20,
+          },
+        },
+        repository,
+        new Date("2026-11-15T17:00:00.000Z"),
+      );
+      const reception = await applyMovementOperation(
+        adjustment.snapshot.id,
+        {
+          operation: "direct_reception",
+          values: {
+            operacion_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa7",
+            centro_id: "C01",
+            producto_id: "P01",
+            sku_id: "AGUA-600",
+            cantidad_paquetes: 5,
+            ocurrido_en: "2026-11-15T12:30:00-05:00",
+          },
+        },
+        repository,
+        new Date("2026-11-15T18:00:00.000Z"),
+      );
+      const query = {
+        centro_id: "C01",
+        producto_id: "P01",
+        corte: "2026-11-15T17:45:00.000Z",
+      };
+      const [physical, informational] = await Promise.all([
+        getTemporalAnalysis(reception.snapshot.id, {
+          ...query,
+          perspectiva: "fisica",
+        }, repository),
+        getTemporalAnalysis(reception.snapshot.id, {
+          ...query,
+          perspectiva: "informativa",
+        }, repository),
+      ]);
+      const packages = (analysis: typeof physical) =>
+        analysis.reconstruccion.inventario.find(
+          (row) => row.centro_id === "C01" && row.sku_id === "AGUA-600",
+        )?.cantidad_paquetes;
+
+      expect(packages(physical)).toBe(25);
+      expect(packages(informational)).toBe(20);
+      expect(physical.eventos).toHaveLength(2);
+      expect(new Set(physical.eventos.map((event) => event.evento_id)).size).toBe(2);
+      expect(physical.series.movimientos_por_hora).toContainEqual(
+        expect.objectContaining({
+          fecha_local: "2026-11-15",
+          hora_local: 12,
+          recepciones: 1,
+          paquetes_recibidos: 5,
+        }),
+      );
+      expect(physical.series.desfase_registro).toContainEqual(
+        expect.objectContaining({ desfase_minutos: 30 }),
+      );
+      expect(informational.eventos.map((event) => event.tipo)).toEqual([
+        "ajuste_inventario",
+      ]);
+      expect(physical.indicadores.alertas.referencia_id).toBe(SNAPSHOT_A);
+      expect(physical.indicadores.alertas.evaluado_en).toBe(query.corte);
+      expect(physical.completitud.estado).toBe("completa");
+      await expect(repository.listInventory(SNAPSHOT_A)).resolves.toContainEqual(
+        expect.objectContaining({
+          centro_id: "C01",
+          sku_id: "AGUA-600",
+          cantidad_paquetes: 10,
+        }),
+      );
+    } finally {
+      await roots.cleanup();
+    }
+  });
+
+  it("M6 agrupa correctamente una recepción cercana a medianoche en Bogotá", async () => {
+    const roots = await createTempDataRoots();
+    try {
+      const repository = new CsvOperationsRepository({
+        demoRoot: PROJECT_DEMO_ROOT,
+        runtimeRoot: roots.runtimeRoot,
+      });
+      const reception = await applyMovementOperation(
+        SNAPSHOT_A,
+        {
+          operation: "direct_reception",
+          values: {
+            operacion_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa8",
+            centro_id: "C01",
+            producto_id: "P01",
+            sku_id: "AGUA-600",
+            cantidad_paquetes: 1,
+            ocurrido_en: "2026-11-16T00:05:00-05:00",
+          },
+        },
+        repository,
+        new Date("2026-11-16T05:10:00.000Z"),
+      );
+      const analysis = await getTemporalAnalysis(
+        reception.snapshot.id,
+        {
+          centro_id: "C01",
+          producto_id: "P01",
+          corte: "2026-11-16T05:30:00.000Z",
+          perspectiva: "fisica",
+        },
+        repository,
+      );
+      expect(analysis.series.movimientos_por_hora).toEqual([
+        expect.objectContaining({
+          fecha_local: "2026-11-16",
+          hora_local: 0,
+          recepciones: 1,
+        }),
+      ]);
     } finally {
       await roots.cleanup();
     }
@@ -608,6 +767,15 @@ describe("repositorio CSV", () => {
         dashboard.centros
           .find((center) => center.centro_id === "C01")
           ?.productos.find((product) => product.producto_id === "P01");
+      const coverageAlert = (
+        dashboard: Awaited<ReturnType<typeof getDashboard>>,
+      ) =>
+        dashboard.alertas.alertas.find(
+          (alert) =>
+            alert.tipo === "deficit_cobertura" &&
+            alert.centro_id === "C01" &&
+            alert.producto_id === "P01",
+        );
 
       expect(first.idempotent).toBe(false);
       expect(repeated.idempotent).toBe(true);
@@ -622,6 +790,20 @@ describe("repositorio CSV", () => {
         inventario_confirmado_unidad_base: 18_000,
         deficit_confirmado_unidad_base: 2_000,
         donaciones_esperadas_unidad_base: 0,
+      });
+      expect(coverageAlert(original)).toMatchObject({
+        alerta_id: "alerta:deficit_cobertura:C01:P01",
+        titulo: "Déficit importante",
+        severidad: "advertencia",
+        valor_observado: 60,
+        referencia_id: SNAPSHOT_A,
+      });
+      expect(coverageAlert(operational)).toMatchObject({
+        alerta_id: "alerta:deficit_cobertura:C01:P01",
+        titulo: "Déficit moderado",
+        severidad: "informativa",
+        valor_observado: 90,
+        referencia_id: first.snapshot.id,
       });
       expect(donations).toContainEqual(
         expect.objectContaining({

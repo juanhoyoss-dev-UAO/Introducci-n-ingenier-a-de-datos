@@ -126,6 +126,7 @@ function reidentifySnapshot(bundle: SnapshotBundle, snapshotId: string) {
     bundle.travelTimes,
     bundle.expectedDonations,
     bundle.movements,
+    bundle.operationalEvents,
   ]) {
     for (const row of collection) {
       row.snapshot_id = snapshotId;
@@ -174,11 +175,17 @@ function createMovementVersion(
   const operationId = operation.values.operacion_id;
   const nextId = snapshotIdForOperation(operationId);
   const registeredAt = now.toISOString();
+  const scenarioId = source.metadata.escenario_id ?? sourceSnapshotId;
+  const baseSnapshotId =
+    source.metadata.snapshot_base_id ?? sourceSnapshotId;
   next.metadata = {
     id: nextId,
     nombre: `${source.metadata.nombre} · movimiento operativo`,
     created_at: registeredAt,
     descripcion: `Versión operativa M4 derivada del snapshot ${sourceSnapshotId}.`,
+    escenario_id: scenarioId,
+    snapshot_origen_id: sourceSnapshotId,
+    snapshot_base_id: baseSnapshotId,
   };
   reidentifySnapshot(next, nextId);
 

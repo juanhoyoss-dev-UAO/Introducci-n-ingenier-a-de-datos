@@ -129,6 +129,69 @@ interface DashboardResponse {
     llegada_prevista: string;
     estado: string;
   }>;
+  alertas: {
+    evaluado_en: string;
+    referencia_id: string;
+    total: number;
+    por_severidad: {
+      critica: number;
+      advertencia: number;
+      informativa: number;
+    };
+    centros_que_requieren_atencion: number;
+    alertas: Array<{
+      alerta_id: string;
+      tipo: string;
+      severidad: string;
+      centro_id: string;
+      producto_id: string | null;
+      titulo: string;
+      valor_observado: number;
+      unidad: string;
+      referencia_id: string;
+    }>;
+  };
+}
+
+interface TemporalResponse {
+  referencia: {
+    snapshot_id: string;
+    escenario_id: string;
+    snapshot_base_id: string;
+  };
+  perspectiva: "fisica" | "informativa";
+  corte: string;
+  completitud: {
+    estado: "completa" | "parcial" | "insuficiente";
+    limitaciones: string[];
+  };
+  eventos: Array<{
+    evento_id: string;
+    tipo: string;
+    ocurrido_en: string;
+    registrado_en: string;
+  }>;
+  reconstruccion: {
+    inventario: Array<{
+      centro_id: string;
+      sku_id: string;
+      cantidad_paquetes: number;
+    }>;
+    eventos_aplicados: string[];
+  };
+  indicadores: {
+    centros_activos: number;
+    alertas: { referencia_id: string; evaluado_en: string };
+  };
+  series: {
+    movimientos_por_hora: Array<{
+      fecha_local: string;
+      hora_local: number;
+      recepciones: number;
+      paquetes_recibidos: number;
+    }>;
+    desfase_registro: Array<{ desfase_minutos: number }>;
+  };
 }
 
 interface RequestOptions {
@@ -612,6 +675,27 @@ describe("HTTP real C2", () => {
         (announcedPresentation?.contenido_por_paquete ?? 0),
     ).toBe(6_000);
     expect(water?.inventario_confirmado_unidad_base).toBe(12_000);
+    expect(dashboard.body.data.alertas.alertas).toContainEqual(
+      expect.objectContaining({
+        alerta_id: "alerta:deficit_cobertura:C01:P01",
+        titulo: "Déficit importante",
+        severidad: "advertencia",
+        valor_observado: 60,
+        unidad: "porcentaje",
+        referencia_id: SNAPSHOT_A,
+      }),
+    );
+    expect(dashboard.body.meta.evaluado_en).toBe(
+      dashboard.body.data.alertas.evaluado_en,
+    );
+  });
+
+  it("M5 protege la consulta de alertas integrada al dashboard", async () => {
+    const anonymous = await api<ApiFailure>(
+      `/api/dashboard?snapshotId=${SNAPSHOT_A}`,
+    );
+    expect(anonymous.response.status).toBe(401);
+    expect(anonymous.body.error.code).toBe("UNAUTHENTICATED");
   });
 
   it("D0-T10 correlaciona API, servicio, repositorio y resultado", async () => {
@@ -927,7 +1011,11 @@ describe("HTTP real C2", () => {
       },
     );
     expect(dispatch.response.status, JSON.stringify(dispatch.body)).toBe(200);
-    const [dashboard, history] = await Promise.all([
+    const [receptionDashboard, dashboard, history] = await Promise.all([
+      api<ApiSuccess<DashboardResponse>>(
+        `/api/dashboard?snapshotId=${reception.body.data.snapshot.id}`,
+        { cookie: administratorCookie },
+      ),
       api<ApiSuccess<DashboardResponse>>(
         `/api/dashboard?snapshotId=${dispatch.body.data.snapshot.id}`,
         { cookie: administratorCookie },
@@ -948,6 +1036,21 @@ describe("HTTP real C2", () => {
       "despacho",
       "recepcion_confirmada",
     ]);
+    const coverageAlert = (body: ApiSuccess<DashboardResponse>) =>
+      body.data.alertas.alertas.find(
+        (alert) =>
+          alert.tipo === "deficit_cobertura" &&
+          alert.centro_id === "C01" &&
+          alert.producto_id === "P01",
+      );
+    expect(coverageAlert(receptionDashboard.body)).toMatchObject({
+      titulo: "Déficit moderado",
+      valor_observado: 75,
+    });
+    expect(coverageAlert(dashboard.body)).toMatchObject({
+      titulo: "Déficit importante",
+      valor_observado: 66,
+    });
   }, 10_000);
 
   it("M4 protege, valida y evita despachos por encima del inventario", async () => {
@@ -1005,6 +1108,109 @@ describe("HTTP real C2", () => {
     expect(insufficient.response.status).toBe(409);
     expect(insufficient.body.error.code).toBe("INSUFFICIENT_INVENTORY");
   }, 10_000);
+
+  it("M6 protege la consulta temporal y reconstruye sin modificar snapshots", async () => {
+    const anonymous = await api<ApiFailure>(
+      `/api/snapshots/${SNAPSHOT_A}/temporal?corte=${encodeURIComponent("2026-11-15T23:00:00-05:00")}`,
+    );
+    expect(anonymous.response.status).toBe(401);
+    expect(anonymous.body.error.code).toBe("UNAUTHENTICATED");
+
+    const reception = await api<ApiSuccess<MovementResponse>>(
+      `/api/snapshots/${SNAPSHOT_A}/movements`,
+      {
+        method: "POST",
+        origin: baseUrl,
+        cookie: administratorCookie,
+        body: {
+          operation: "direct_reception",
+          values: {
+            operacion_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb7",
+            centro_id: "C01",
+            producto_id: "P01",
+            sku_id: "AGUA-600",
+            cantidad_paquetes: 5,
+            ocurrido_en: "2026-11-15T10:00:00-05:00",
+          },
+        },
+      },
+    );
+    expect(reception.response.status, JSON.stringify(reception.body)).toBe(200);
+    const snapshotId = reception.body.data.snapshot.id;
+    const before = await api<ApiSuccess<SnapshotResponse[]>>("/api/snapshots", {
+      cookie: administratorCookie,
+    });
+    const cutoff = "2026-11-15T23:00:00-05:00";
+    const temporal = await api<ApiSuccess<TemporalResponse>>(
+      `/api/snapshots/${snapshotId}/temporal?centroId=C01&productoId=P01&perspectiva=fisica&corte=${encodeURIComponent(cutoff)}`,
+      { cookie: administratorCookie },
+    );
+    const after = await api<ApiSuccess<SnapshotResponse[]>>("/api/snapshots", {
+      cookie: administratorCookie,
+    });
+    const dashboard = await api<ApiSuccess<DashboardResponse>>(
+      `/api/dashboard?snapshotId=${snapshotId}`,
+      { cookie: administratorCookie },
+    );
+
+    expect(temporal.response.status, JSON.stringify(temporal.body)).toBe(200);
+    expect(temporal.body.data).toMatchObject({
+      referencia: {
+        snapshot_id: snapshotId,
+        escenario_id: SNAPSHOT_A,
+        snapshot_base_id: SNAPSHOT_A,
+      },
+      perspectiva: "fisica",
+      corte: cutoff,
+      completitud: { estado: "completa", limitaciones: [] },
+    });
+    expect(temporal.body.data.eventos).toHaveLength(1);
+    expect(temporal.body.data.reconstruccion.inventario).toContainEqual(
+      expect.objectContaining({
+        centro_id: "C01",
+        sku_id: "AGUA-600",
+        cantidad_paquetes: 15,
+      }),
+    );
+    expect(temporal.body.data.series.movimientos_por_hora).toContainEqual(
+      expect.objectContaining({
+        fecha_local: "2026-11-15",
+        hora_local: 10,
+        recepciones: 1,
+        paquetes_recibidos: 5,
+      }),
+    );
+    expect(temporal.body.data.indicadores.alertas).toMatchObject({
+      referencia_id: SNAPSHOT_A,
+      evaluado_en: cutoff,
+    });
+    expect(after.body.data.map((snapshot) => snapshot.id).sort()).toEqual(
+      before.body.data.map((snapshot) => snapshot.id).sort(),
+    );
+    expect(
+      dashboard.body.data.centros
+        .find((center) => center.centro_id === "C01")
+        ?.productos.find((product) => product.producto_id === "P01")
+        ?.existencias,
+    ).toContainEqual(
+      expect.objectContaining({ sku_id: "AGUA-600", cantidad_paquetes: 15 }),
+    );
+  }, 15_000);
+
+  it("M6 valida escenario y periodo temporal", async () => {
+    const mismatch = await api<ApiFailure>(
+      `/api/snapshots/${SNAPSHOT_A}/temporal?escenarioId=${SNAPSHOT_B}&corte=${encodeURIComponent("2026-11-15T23:00:00-05:00")}`,
+      { cookie: administratorCookie },
+    );
+    const invalidPeriod = await api<ApiFailure>(
+      `/api/snapshots/${SNAPSHOT_A}/temporal?desde=${encodeURIComponent("2026-11-15T12:00:00-05:00")}&hasta=${encodeURIComponent("2026-11-15T11:00:00-05:00")}&corte=${encodeURIComponent("2026-11-15T13:00:00-05:00")}`,
+      { cookie: administratorCookie },
+    );
+    expect(mismatch.response.status).toBe(400);
+    expect(mismatch.body.error.code).toBe("SCENARIO_MISMATCH");
+    expect(invalidPeriod.response.status).toBe(400);
+    expect(invalidPeriod.body.error.code).toBe("INVALID_TEMPORAL_QUERY");
+  });
 
   it("T09 rechaza alteración, firma o secreto incorrectos y expiración", async () => {
     const token = administratorCookie.slice(

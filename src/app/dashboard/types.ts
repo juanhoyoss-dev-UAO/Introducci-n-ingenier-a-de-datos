@@ -3,6 +3,7 @@ import type {
   DashboardVisualizations,
   StorageCapacityIndicator,
 } from "@/contracts/types/analytics";
+import type { AlertEvaluationResult } from "@/contracts/types/alerts";
 
 export interface ApiSuccess<T> {
   data: T;
@@ -35,6 +36,9 @@ export interface SnapshotRecord {
   nombre: string;
   created_at: string;
   descripcion: string | null;
+  escenario_id?: string;
+  snapshot_origen_id?: string;
+  snapshot_base_id?: string;
 }
 
 export interface OperationalUpdateResult {
@@ -154,6 +158,7 @@ export interface DashboardData {
   visualizaciones: DashboardVisualizations;
   donaciones_esperadas: ExpectedDonationRecord[];
   movimientos: MovementRecord[];
+  alertas: AlertEvaluationResult;
   candidatos_traslado: unknown[];
 }
 
@@ -169,6 +174,8 @@ export type CenterFilter = "all" | string;
 
 export type DashboardTab =
   | "resumen"
+  | "alertas"
+  | "temporal"
   | "centros"
   | "inventario"
   | "necesidades"
