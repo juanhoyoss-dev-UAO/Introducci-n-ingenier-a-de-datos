@@ -1,0 +1,95 @@
+{
+  "generated_at_scenario": "2026-11-16T17:02:00-05:00",
+  "results": [
+    {
+      "Excel": "RECEPCION_01.xlsx",
+      "Centro": "C03",
+      "Productos": "Filtro portatil de agua",
+      "Alertas antes": 196,
+      "Alertas después": 196,
+      "Resueltas": 0,
+      "Reducción de severidad": 1
+    },
+    {
+      "Excel": "RECEPCION_02.xlsx",
+      "Centro": "C05",
+      "Productos": "Extension electrica de 20 m",
+      "Alertas antes": 196,
+      "Alertas después": 195,
+      "Resueltas": 1,
+      "Reducción de severidad": 0
+    },
+    {
+      "Excel": "RECEPCION_03.xlsx",
+      "Centro": "C06",
+      "Productos": "Aceite vegetal",
+      "Alertas antes": 195,
+      "Alertas después": 195,
+      "Resueltas": 0,
+      "Reducción de severidad": 1
+    },
+    {
+      "Excel": "RECEPCION_04.xlsx",
+      "Centro": "C01",
+      "Productos": "Pico, Taladro electrico, Conserva de proteina",
+      "Alertas antes": 195,
+      "Alertas después": 194,
+      "Resueltas": 1,
+      "Reducción de severidad": 2
+    },
+    {
+      "Excel": "RECEPCION_05.xlsx",
+      "Centro": "C04",
+      "Productos": "Manta",
+      "Alertas antes": 194,
+      "Alertas después": 194,
+      "Resueltas": 0,
+      "Reducción de severidad": 1
+    },
+    {
+      "Excel": "RECEPCION_06.xlsx",
+      "Centro": "C03",
+      "Productos": "Frijol seco",
+      "Alertas antes": 195,
+      "Alertas después": 195,
+      "Resueltas": 0,
+      "Reducción de severidad": 1
+    },
+    {
+      "Excel": "RECEPCION_07.xlsx",
+      "Centro": "C02",
+      "Productos": "Frijol seco",
+      "Alertas antes": 196,
+      "Alertas después": 196,
+      "Resueltas": 1,
+      "Reducción de severidad": 0
+    },
+    {
+      "Excel": "RECEPCION_08.xlsx",
+      "Centro": "C05",
+      "Productos": "Filtro portatil de agua",
+      "Alertas antes": 197,
+      "Alertas después": 197,
+      "Resueltas": 0,
+      "Reducción de severidad": 1
+    },
+    {
+      "Excel": "RECEPCION_09.xlsx",
+      "Centro": "C06",
+      "Productos": "Casco de seguridad",
+      "Alertas antes": 200,
+      "Alertas después": 199,
+      "Resueltas": 1,
+      "Reducción de severidad": 0
+    },
+    {
+      "Excel": "RECEPCION_10.xlsx",
+      "Centro": "C03, C04, C02",
+      "Productos": "Aceite vegetal, Casco de seguridad, Extension electrica de 20 m",
+      "Alertas antes": 201,
+      "Alertas después": 199,
+      "Resueltas": 2,
+      "Reducción de severidad": 1
+    }
+  ]
+}

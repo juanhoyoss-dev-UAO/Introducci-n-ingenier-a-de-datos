@@ -1,0 +1,9 @@
+{
+  "id": "a3000000-0000-4000-8000-000000000002",
+  "nombre": "Emergencia semanal — PRUEBAS · estado base",
+  "created_at": "2026-11-16T00:00:00-05:00",
+  "descripcion": "Copia operativa independiente del cierre M6.5; conserva el estado final y reinicia el historial de la rama de pruebas.",
+  "escenario_id": "a3000000-0000-4000-8000-000000000001",
+  "snapshot_origen_id": "65000000-0000-4000-8000-000000000003",
+  "snapshot_base_id": "a3000000-0000-4000-8000-000000000002"
+}

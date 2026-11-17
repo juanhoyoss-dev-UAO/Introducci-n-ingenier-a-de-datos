@@ -1,5 +1,100 @@
 # Bitácora técnica
 
+## 2026-11-16 - Bloque A4.2
+
+### Objetivo
+
+Permitir registrar una recepción persistente desde una alerta de déficit, sin abandonar Alertas operativas ni crear otra lógica de inventario.
+
+### Implementación
+
+- Sustituida la franja oscura por una línea compacta con título y hora del escenario.
+- Añadido `Solucionar alerta` solo para déficits de producto; las demás acciones permanecen sin cambios.
+- Añadido un modal accesible con centro, producto, inventario, necesidad, déficit, cobertura, severidad, presentación, paquetes y fecha operativa.
+- La vista previa reutiliza las fórmulas de dominio y el contenido real de la presentación para informar inventario, cobertura, déficit y excedente estimados.
+- El guardado usa la recepción directa M4, mantiene el UUID en reintentos, bloquea doble envío y conserva errores recuperables.
+- Tras recargar la nueva versión, el resumen compara datos reales de backend, conserva el grupo abierto y distingue alerta resuelta, severidad reducida o alerta activa.
+- MAIN queda deshabilitado en la interfaz y protegido por el servicio existente. No se modificaron contratos, motor de alertas, importador Excel ni Resumen operativo.
+
+### Verificaciones reales
+
+- Pruebas dirigidas: 6 archivos, 33/33.
+- Escenario real P27/C01: 0/12 unidades; recepción parcial de 3 produjo 25 % y déficit 9; recepción adicional de 9 produjo 100 %, déficit 0 y eliminó la alerta.
+- El reintento de la segunda recepción fue idempotente y dejó exactamente dos movimientos; MAIN rechazó la operación.
+- `npm run lint`: aprobado.
+- `npm run typecheck`: aprobado.
+- No se ejecutaron HTTP completo ni build porque no cambiaron rutas, servicios o contratos.
+- No se realizó verificación interactiva de navegador.
+
+### Pendientes
+
+- A4.3: Excel por categoría y plantillas amigables.
+- A4.4: resumen de efectos y cierre final de pruebas.
+- No iniciar fases posteriores ni hacer commit, push, merge o rebase sin autorización.
+
+## 2026-11-16 - Bloque A4.1
+
+### Objetivo
+
+Reemplazar la lista inicial de alertas individuales por una gestión agrupada, sin cambiar el motor, los umbrales ni las operaciones A3.
+
+### Implementación
+
+- Añadidos cuatro grupos accesibles y responsivos, cerrados inicialmente y ordenados por la severidad máxima y la cantidad de alertas.
+- Cada grupo informa alertas activas, críticas, centros afectados y gravedad máxima; solo renderiza sus tarjetas al abrirse.
+- Los 32 productos se vinculan explícitamente con las ocho categorías M6.5 y los tres grupos de abastecimiento, sin analizar palabras de los nombres.
+- Las alertas no asociadas a escasez se agrupan en Otras alertas operativas; los excedentes se etiquetan como oportunidades de abastecimiento.
+- Los filtros existentes de centro, severidad y tipo se conservan y no alteran el estado abierto/cerrado de los grupos.
+- El importador A3 se conserva sin cambios funcionales después de la vista agrupada. Su limitación por categoría corresponde a A4.3.
+
+### Verificaciones reales
+
+- `npm run test:unit`: 11 archivos, 78/78.
+- Prueba dirigida de alertas y agrupación: 3 archivos, 25/25.
+- `npm run lint`: aprobado.
+- `npm run typecheck`: aprobado.
+- No se ejecutaron HTTP ni build porque A4.1 no modifica rutas, backend ni contratos.
+- No se realizó verificación interactiva de navegador en esta ejecución.
+
+### Pendientes
+
+- A4.2: formulario de resolución individual.
+- A4.3: importación Excel limitada por categoría y plantillas amigables.
+- A4.4: resumen de efectos y cierre de pruebas dirigidas.
+- No iniciar el siguiente microbloque sin autorización; no hacer commit, push, merge ni rebase.
+
+## 2026-11-16 - Fase A3
+
+### Objetivo
+
+Importar recepciones confirmadas desde XLSX en un escenario PRUEBAS independiente, recalcular indicadores y alertas, y demostrar diez operaciones consecutivas sin modificar MAIN.
+
+### Implementación
+
+- Creada la base PRUEBAS desde el cierre M6.5 con los catálogos, necesidades e inventario finales, pero sin copiar movimientos ni eventos ya incorporados.
+- Protegido MAIN contra movimientos, ediciones administrativas e importaciones Excel.
+- Añadidos lectura y validación de la hoja `Recepciones`, previsualización, confirmación explícita, publicación atómica por archivo e idempotencia por UUID de operación.
+- Añadidos resultado comparativo antes/después, selección automática de la versión publicada y reinicio explícito de PRUEBAS desde MAIN.
+- Añadidos plantilla, diez XLSX, manifiesto, resultado reproducible y generadores para el escenario y los libros.
+- El dashboard y las alertas usan la hora del snapshot/recepción, no el reloj real del equipo.
+
+### Verificaciones reales
+
+- `npm run test:unit`: 9 archivos, 73/73.
+- Integración dirigida A3 + repositorio CSV + escenario semanal: 3 archivos, 24/24.
+- Primera pasada ampliada: falló por cinco conteos históricos de snapshots y el límite global de 5 s; se actualizaron las expectativas a cinco snapshots base y se asignaron 15 s únicamente a la prueba A3. La repetición aprobó completa.
+- `npm run lint`: aprobado.
+- `npm run typecheck`: aprobado.
+- XLSX: 11 libros, 12 hojas renderizadas, revisión visual aprobada y cero errores de fórmula detectados.
+- Secuencia real: seis alertas resueltas, ocho reducciones de severidad, recepción múltiple en `RECEPCION_04.xlsx` y tres centros en `RECEPCION_10.xlsx`.
+- Navegador: la ventana accesible correspondía a una instancia anterior en otro puerto; no se interactuó con datos y no se declara verificación visual de la interfaz A3.
+
+### Pendientes
+
+- Realizar la demostración manual autenticada siguiendo `docs/DEMO_A3.md`.
+- Revisar por separado las vulnerabilidades informadas por `npm audit`; no se ejecutó `audit fix` ni se alteraron versiones fuera del alcance A3.
+- No iniciar M7 ni hacer commit, push, merge o rebase sin autorización.
+
 ## 2026-11-16 - Bloque M6.5
 
 ### Objetivo

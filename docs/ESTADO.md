@@ -1,5 +1,39 @@
 # Estado del proyecto
 
+## Checkpoint A4.2
+
+- Estado: resolución individual de alertas de déficit implementada; A4.3, A4.4 y M7 no iniciados.
+- Interfaz: retirada la franja oscura de Alertas operativas y reemplazada por título y hora de evaluación compactos.
+- Recepción: cada déficit de producto en PRUEBAS abre un modal con datos precargados, presentación, paquetes enteros positivos, hora operativa y vista previa en unidad base.
+- Persistencia: el formulario reutiliza `direct_reception` de M4; publica una versión atómica, registra un solo movimiento, recarga indicadores y deja que el motor determine si la alerta continúa o desaparece.
+- Experiencia: el grupo abierto se conserva durante la recarga y el resultado posterior informa inventario/cobertura reales, déficit, excedente y cambio de severidad.
+- Protección: MAIN no ofrece guardado y el backend mantiene `SCENARIO_READ_ONLY`; el UUID estable y el bloqueo durante el envío evitan duplicados.
+- Verificaciones A4.2: 33/33 pruebas dirigidas, lint y typecheck aprobados. El caso real P27/C01 pasó de 0/12 a 3/12 y luego a 12/12, eliminando el déficit; el reintento fue idempotente.
+- Sin HTTP completo, build ni verificación interactiva de navegador; sin commit, push, merge o rebase.
+
+## Checkpoint A4.1
+
+- Estado: agrupación visual del Centro de alertas implementada; A4.2, A4.3 y A4.4 no iniciados.
+- Interfaz: cuatro grupos cerrados inicialmente, con conteos de alertas, críticas y centros, gravedad máxima, orden por severidad/volumen y detalle bajo demanda.
+- Catálogo: los 32 productos M6.5 se asignan explícitamente desde sus identificadores y ocho categorías reales; no se infieren categorías a partir de nombres.
+- Alertas: déficits y excedentes permanecen en el grupo de su producto; los excedentes se distinguen como oportunidades de abastecimiento y las condiciones no asociadas a escasez se concentran en Otras alertas operativas.
+- Filtros: centro, severidad y tipo actualizan los cuatro grupos sin cerrar los que el administrador abrió.
+- Compatibilidad: no se modificaron motor de alertas, contratos, persistencia, Resumen operativo ni importador A3.
+- Verificaciones A4.1: unitarias 78/78, prueba dirigida 25/25, lint y typecheck aprobados. Sin verificación interactiva de navegador en esta ejecución.
+- Sin commit, push, merge ni rebase.
+
+## Checkpoint A3
+
+- Estado: importación XLSX de recepciones confirmadas implementada sobre una rama de datos PRUEBAS independiente; M7 no iniciado.
+- Escenarios: MAIN conserva íntegros el cierre, movimientos y eventos M6.5 y rechaza mutaciones; PRUEBAS parte del mismo inventario final con historial nuevo vacío y trazabilidad a MAIN.
+- Excel: plantilla exacta y diez archivos secuenciales en `data/demo/a3/`, con horas del 16 de noviembre de 2026 en `America/Bogota`, manifiesto y resultados reales.
+- Integridad: máximo 1 MB y 100 filas, hoja/columnas exactas, referencias de catálogo, UUID, fecha con `-05:00`, cantidad entera positiva, lote atómico e idempotencia por operación.
+- Recalculo: cada importación publica una sola versión, usa el reloj del escenario y compara inventario, cobertura, déficit y alertas antes/después.
+- Resultado secuencial: 10/10 archivos válidos, seis alertas resueltas y ocho reducciones de severidad; cada reimportación fue reconocida sin duplicar existencias y MAIN permaneció sin cambios.
+- Verificaciones A3: unitarias 73/73; integración dirigida 24/24; lint y typecheck aprobados. Los 11 XLSX y sus 12 hojas fueron renderizados e inspeccionados; la interfaz A3 no se declara verificada porque la ventana accesible correspondía a una instancia anterior.
+- Dependencias: `read-excel-file@9.3.14` para lectura XLSX sin ejecutar fórmulas y `vite@7.2.2` como dependencia de desarrollo requerida por Vitest.
+- Demostración: `docs/DEMO_A3.md`. Sin commit, push, merge ni rebase.
+
 ## Checkpoint M6.5
 
 - Estado: escenario semanal integral SIMULADO implementado y listo para analisis; M7 no iniciado.

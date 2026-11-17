@@ -1,0 +1,81 @@
+{
+  "scenario": "Emergencia semanal — PRUEBAS",
+  "date": "2026-11-16",
+  "timezone": "America/Bogota",
+  "files": [
+    {
+      "file": "RECEPCION_01.xlsx",
+      "purpose": "Reducir de crítica a advertencia la escasez de filtros en C03.",
+      "rows": [
+        { "operacion_id": "a3010000-0001-4000-8000-000000000001", "recibido_en": "2026-11-16T08:00:00-05:00", "centro_id": "C03", "sku_id": "FILTRO-PORT", "cantidad_paquetes": 1 }
+      ]
+    },
+    {
+      "file": "RECEPCION_02.xlsx",
+      "purpose": "Cubrir completamente la necesidad de extensiones eléctricas en C05.",
+      "rows": [
+        { "operacion_id": "a3020000-0001-4000-8000-000000000001", "recibido_en": "2026-11-16T09:00:00-05:00", "centro_id": "C05", "sku_id": "EXTENSION-ROLLO20", "cantidad_paquetes": 12 }
+      ]
+    },
+    {
+      "file": "RECEPCION_03.xlsx",
+      "purpose": "Reducir sin resolver la escasez de aceite en C06.",
+      "rows": [
+        { "operacion_id": "a3030000-0001-4000-8000-000000000001", "recibido_en": "2026-11-16T10:00:00-05:00", "centro_id": "C06", "sku_id": "ACEITE-1000", "cantidad_paquetes": 6 }
+      ]
+    },
+    {
+      "file": "RECEPCION_04.xlsx",
+      "purpose": "Modificar tres alertas de productos diferentes de C01 en un solo lote.",
+      "rows": [
+        { "operacion_id": "a3040000-0001-4000-8000-000000000001", "recibido_en": "2026-11-16T11:00:00-05:00", "centro_id": "C01", "sku_id": "PICO-UN", "cantidad_paquetes": 12 },
+        { "operacion_id": "a3040000-0002-4000-8000-000000000002", "recibido_en": "2026-11-16T11:01:00-05:00", "centro_id": "C01", "sku_id": "TALADRO-UN", "cantidad_paquetes": 6 },
+        { "operacion_id": "a3040000-0003-4000-8000-000000000003", "recibido_en": "2026-11-16T11:02:00-05:00", "centro_id": "C01", "sku_id": "CONSERVA-160", "cantidad_paquetes": 17 }
+      ]
+    },
+    {
+      "file": "RECEPCION_05.xlsx",
+      "purpose": "Elevar la cobertura de mantas en C04 sin sumar unidades incompatibles.",
+      "rows": [
+        { "operacion_id": "a3050000-0001-4000-8000-000000000001", "recibido_en": "2026-11-16T12:00:00-05:00", "centro_id": "C04", "sku_id": "MANTA-BULTO5", "cantidad_paquetes": 2 }
+      ]
+    },
+    {
+      "file": "RECEPCION_06.xlsx",
+      "purpose": "Reducir el déficit de frijol en C03 y mantener una alerta activa.",
+      "rows": [
+        { "operacion_id": "a3060000-0001-4000-8000-000000000001", "recibido_en": "2026-11-16T13:00:00-05:00", "centro_id": "C03", "sku_id": "FRIJOL-5000", "cantidad_paquetes": 4 }
+      ]
+    },
+    {
+      "file": "RECEPCION_07.xlsx",
+      "purpose": "Cubrir y generar excedente de frijol en C02.",
+      "rows": [
+        { "operacion_id": "a3070000-0001-4000-8000-000000000001", "recibido_en": "2026-11-16T14:00:00-05:00", "centro_id": "C02", "sku_id": "FRIJOL-5000", "cantidad_paquetes": 3 }
+      ]
+    },
+    {
+      "file": "RECEPCION_08.xlsx",
+      "purpose": "Reducir sin resolver la escasez de filtros en C05.",
+      "rows": [
+        { "operacion_id": "a3080000-0001-4000-8000-000000000001", "recibido_en": "2026-11-16T15:00:00-05:00", "centro_id": "C05", "sku_id": "FILTRO-PORT", "cantidad_paquetes": 4 }
+      ]
+    },
+    {
+      "file": "RECEPCION_09.xlsx",
+      "purpose": "Resolver completamente la escasez de cascos en C06.",
+      "rows": [
+        { "operacion_id": "a3090000-0001-4000-8000-000000000001", "recibido_en": "2026-11-16T16:00:00-05:00", "centro_id": "C06", "sku_id": "CASCO-UN", "cantidad_paquetes": 12 }
+      ]
+    },
+    {
+      "file": "RECEPCION_10.xlsx",
+      "purpose": "Modificar simultáneamente alertas en C02, C03 y C04.",
+      "rows": [
+        { "operacion_id": "a3100000-0001-4000-8000-000000000001", "recibido_en": "2026-11-16T17:00:00-05:00", "centro_id": "C03", "sku_id": "ACEITE-1000", "cantidad_paquetes": 18 },
+        { "operacion_id": "a3100000-0002-4000-8000-000000000002", "recibido_en": "2026-11-16T17:01:00-05:00", "centro_id": "C04", "sku_id": "CASCO-UN", "cantidad_paquetes": 7 },
+        { "operacion_id": "a3100000-0003-4000-8000-000000000003", "recibido_en": "2026-11-16T17:02:00-05:00", "centro_id": "C02", "sku_id": "EXTENSION-ROLLO20", "cantidad_paquetes": 12 }
+      ]
+    }
+  ]
+}

@@ -378,11 +378,16 @@ function evolutionSeries(
         });
       }
     }
-    if (query.centro_id && query.producto_id) {
-      pairs.set(`${query.centro_id}\u0000${query.producto_id}`, {
-        centerId: query.centro_id,
-        productId: query.producto_id,
-      });
+    if (query.producto_id) {
+      const centerIds = query.centro_id
+        ? [query.centro_id]
+        : state.centers.map((center) => center.centro_id);
+      for (const centerId of centerIds) {
+        pairs.set(`${centerId}\u0000${query.producto_id}`, {
+          centerId,
+          productId: query.producto_id,
+        });
+      }
     }
     for (const pair of pairs.values()) {
       const point = productPoint(

@@ -1,5 +1,3 @@
-import { createHash } from "node:crypto";
-
 import {
   movementHistoryQuerySchema,
   movementOperationSchema,
@@ -14,6 +12,8 @@ import {
 } from "@/server/repositories/operations";
 import { serverLog } from "@/server/observability/request-context";
 import { ApiError, RepositoryError } from "./errors";
+import { assertSnapshotWritable } from "./scenario-protection";
+import { reidentifySnapshot, stableUuid } from "./snapshot-versioning";
 
 export interface MovementOperationResult {
   snapshot: SnapshotRecord;
@@ -21,14 +21,6 @@ export interface MovementOperationResult {
   operation: MovementOperation["operation"];
   movement: MovementRecord;
   idempotent: boolean;
-}
-
-function stableUuid(label: string) {
-  const bytes = createHash("sha256").update(label).digest().subarray(0, 16);
-  bytes[6] = (bytes[6] & 0x0f) | 0x50;
-  bytes[8] = (bytes[8] & 0x3f) | 0x80;
-  const hex = bytes.toString("hex");
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
 function snapshotIdForOperation(operationId: string) {
@@ -113,25 +105,6 @@ function existingResult(
     movement,
     idempotent: true,
   };
-}
-
-function reidentifySnapshot(bundle: SnapshotBundle, snapshotId: string) {
-  for (const collection of [
-    bundle.centers,
-    bundle.products,
-    bundle.presentations,
-    bundle.inventory,
-    bundle.needs,
-    bundle.volunteers,
-    bundle.travelTimes,
-    bundle.expectedDonations,
-    bundle.movements,
-    bundle.operationalEvents,
-  ]) {
-    for (const row of collection) {
-      row.snapshot_id = snapshotId;
-    }
-  }
 }
 
 function changeInventory(
@@ -294,14 +267,15 @@ export async function applyMovementOperation(
     );
   }
   const operation = parsed.data;
+  const source = await repository.getSnapshotBundle(sourceSnapshotId);
+  if (!source) {
+    throw new ApiError(404, "SNAPSHOT_NOT_FOUND", "El snapshot no existe.");
+  }
+  assertSnapshotWritable(source.metadata);
   const nextSnapshotId = snapshotIdForOperation(operation.values.operacion_id);
   const existing = await repository.getSnapshotBundle(nextSnapshotId);
   if (existing) {
     return existingResult(existing, sourceSnapshotId, operation);
-  }
-  const source = await repository.getSnapshotBundle(sourceSnapshotId);
-  if (!source) {
-    throw new ApiError(404, "SNAPSHOT_NOT_FOUND", "El snapshot no existe.");
   }
 
   const startedAt = performance.now();

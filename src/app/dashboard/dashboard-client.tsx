@@ -5,7 +5,18 @@ import { useRouter } from "next/navigation";
 
 import type { OperationalUpdate } from "@/contracts/schemas/operational-updates";
 import type { MovementOperation } from "@/contracts/schemas/movement-operations";
+import type {
+  ExcelReceptionImportResult,
+  TestingScenarioResetResult,
+} from "@/contracts/types/excel-receptions";
 import { logger } from "@/lib/logger";
+import type { AlertGroupId } from "./alert-groups";
+import {
+  buildAlertResolutionSummary,
+  pendingReception,
+  type AlertReceptionContext,
+  type PendingAlertReception,
+} from "./alert-resolution";
 import { AdministrativeEditor } from "./components/administrative-editor";
 import { AlertCenter } from "./components/alert-center";
 import { DashboardStatus } from "./components/dashboard-status";
@@ -19,11 +30,12 @@ import {
   findWeeklyOperationalSnapshot,
   inventoryRows,
   needRows,
+  operationalScenarioKey,
+  operationalScenarioOptions,
   sortSnapshots,
-  summarySnapshotOptions,
   travelTimeRows,
   volunteerRows,
-  WEEKLY_SCENARIO_LABEL,
+  type OperationalScenarioKey,
 } from "./view-model";
 import type {
   ApiFailure,
@@ -46,7 +58,7 @@ import type {
 const TABS: ReadonlyArray<{ id: DashboardTab; label: string }> = [
   { id: "resumen", label: "Resumen operativo" },
   { id: "alertas", label: "Alertas operativas" },
-  { id: "temporal", label: "Evolución temporal" },
+  { id: "temporal", label: "Historial operativo" },
   { id: "centros", label: "Centros" },
   { id: "inventario", label: "Inventario" },
   { id: "necesidades", label: "Necesidades" },
@@ -196,6 +208,8 @@ export default function DashboardClient({
   const [user, setUser] = useState(initialUser);
   const [snapshots, setSnapshots] = useState<SnapshotRecord[]>([]);
   const [selectedSnapshotId, setSelectedSnapshotId] = useState("");
+  const [selectedScenario, setSelectedScenario] =
+    useState<OperationalScenarioKey>("main");
   const [centerFilter, setCenterFilter] = useState<CenterFilter>("all");
   const [productFilter, setProductFilter] = useState(ALL_PRODUCTS_FILTER);
   const [activeTab, setActiveTab] = useState<DashboardTab>("resumen");
@@ -205,11 +219,22 @@ export default function DashboardClient({
   const [loggingOut, setLoggingOut] = useState(false);
   const [error, setError] = useState("");
   const [mutationNotice, setMutationNotice] = useState("");
+  const [excelImportResult, setExcelImportResult] =
+    useState<ExcelReceptionImportResult | null>(null);
+  const [alertOpenGroups, setAlertOpenGroups] = useState<AlertGroupId[]>([]);
+  const [pendingAlertReception, setPendingAlertReception] =
+    useState<PendingAlertReception | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
-  const selectableSnapshots = useMemo(
+  const alertResolutionSummary = useMemo(
     () =>
-      activeTab === "resumen" ? summarySnapshotOptions(snapshots) : snapshots,
-    [activeTab, snapshots],
+      bundle && pendingAlertReception
+        ? buildAlertResolutionSummary(bundle, pendingAlertReception)
+        : null,
+    [bundle, pendingAlertReception],
+  );
+  const scenarioOptions = useMemo(
+    () => operationalScenarioOptions(snapshots),
+    [snapshots],
   );
 
   useEffect(() => {
@@ -245,6 +270,7 @@ export default function DashboardClient({
         const weeklySnapshot = findWeeklyOperationalSnapshot(orderedSnapshots);
         setUser(session.user);
         setSnapshots(orderedSnapshots);
+        setSelectedScenario("main");
         setLoading(weeklySnapshot !== null);
         setSelectedSnapshotId(weeklySnapshot?.id ?? "");
         if (!weeklySnapshot && orderedSnapshots.length > 0) {
@@ -453,8 +479,18 @@ export default function DashboardClient({
     setProductFilter(ALL_PRODUCTS_FILTER);
     setError("");
     setMutationNotice("");
+    setExcelImportResult(null);
+    setAlertOpenGroups([]);
+    setPendingAlertReception(null);
     setLoading(true);
     setSelectedSnapshotId(snapshotId);
+  }
+
+  function selectScenario(scenario: OperationalScenarioKey) {
+    const option = scenarioOptions.find((item) => item.key === scenario);
+    if (!option) return;
+    setSelectedScenario(scenario);
+    selectSnapshot(option.snapshot.id);
   }
 
   function retrySnapshot() {
@@ -478,13 +514,46 @@ export default function DashboardClient({
   }
 
   function selectDashboardTab(tab: DashboardTab) {
-    if (tab === "resumen") {
-      const weeklySnapshot = findWeeklyOperationalSnapshot(snapshots);
-      if (weeklySnapshot && weeklySnapshot.id !== selectedSnapshotId) {
-        selectSnapshot(weeklySnapshot.id);
-      }
-    }
     setActiveTab(tab);
+  }
+
+  function selectPublishedSnapshot(snapshot: SnapshotRecord, notice: string) {
+    setSnapshots((current) =>
+      sortSnapshots([
+        snapshot,
+        ...current.filter((item) => item.id !== snapshot.id),
+      ]),
+    );
+    setBundle(null);
+    setCenterFilter("all");
+    setProductFilter(ALL_PRODUCTS_FILTER);
+    setError("");
+    setLoading(true);
+    setSelectedScenario(operationalScenarioKey(snapshot) ?? selectedScenario);
+    setSelectedSnapshotId(snapshot.id);
+    setMutationNotice(notice);
+  }
+
+  function handleExcelImport(result: ExcelReceptionImportResult) {
+    setExcelImportResult(result);
+    selectPublishedSnapshot(
+      result.snapshot,
+      result.idempotent
+        ? "El archivo ya estaba aplicado. No se duplicó el inventario."
+        : "Recepción Excel registrada; inventario y alertas fueron recalculados.",
+    );
+  }
+
+  function handleTestingReset(result: TestingScenarioResetResult) {
+    setExcelImportResult(null);
+    setPendingAlertReception(null);
+    setAlertOpenGroups([]);
+    selectPublishedSnapshot(
+      result.snapshot,
+      result.idempotent
+        ? "El reinicio ya estaba aplicado; se recargaron inventario y alertas de PRUEBAS."
+        : "PRUEBAS se restauró con el inventario de MAIN y sus alertas fueron recalculadas.",
+    );
   }
 
   async function saveOperationalUpdate(update: OperationalUpdate) {
@@ -564,6 +633,21 @@ export default function DashboardClient({
       sourceSnapshotId,
       snapshotId: result.snapshot.id,
     });
+    return result;
+  }
+
+  async function saveAlertReception(
+    update: MovementOperation,
+    context: AlertReceptionContext,
+  ) {
+    setPendingAlertReception(null);
+    const result = await saveMovement(update);
+    setPendingAlertReception(pendingReception(context, result));
+    setAlertOpenGroups((current) =>
+      current.includes(context.groupId)
+        ? current
+        : [...current, context.groupId],
+    );
   }
 
   function renderActivePanel() {
@@ -584,14 +668,23 @@ export default function DashboardClient({
     if (activeTab === "alertas") {
       return (
         <AlertCenter
-          centers={bundle.centers}
+          dashboardCenters={bundle.dashboard.centros}
           evaluation={bundle.dashboard.alertas}
           initialCenterFilter={centerFilter}
-          key={`${bundle.snapshot.id}-${centerFilter}`}
+          key={centerFilter}
+          latestImportResult={excelImportResult}
+          onImportComplete={handleExcelImport}
           onNavigate={(tab, centerId) => {
             setCenterFilter(centerId);
             setActiveTab(tab);
           }}
+          onOpenGroupsChange={setAlertOpenGroups}
+          onSaveReception={saveAlertReception}
+          onResetComplete={handleTestingReset}
+          openGroups={alertOpenGroups}
+          products={bundle.products}
+          resolutionSummary={alertResolutionSummary}
+          snapshot={bundle.snapshot}
         />
       );
     }
@@ -719,7 +812,9 @@ export default function DashboardClient({
           bundle={bundle}
           centerFilter={centerFilter}
           key={`${bundle.snapshot.id}-${centerFilter}`}
-          onSave={saveMovement}
+          onSave={async (update) => {
+            await saveMovement(update);
+          }}
         />
       );
     }
@@ -780,22 +875,22 @@ export default function DashboardClient({
             Snapshot operativo
             <select
               className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-slate-950 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100"
-              disabled={bootstrapping || selectableSnapshots.length === 0}
-              onChange={(event) => selectSnapshot(event.target.value)}
-              value={selectedSnapshotId}
+              disabled={bootstrapping || scenarioOptions.length === 0}
+              onChange={(event) =>
+                selectScenario(event.target.value as OperationalScenarioKey)
+              }
+              value={selectedScenario}
             >
-              {selectableSnapshots.length === 0 ? (
+              {scenarioOptions.length === 0 ? (
                 <option value="">
                   {snapshots.length === 0
                     ? "Sin snapshots disponibles"
                     : "Escenario semanal no disponible"}
                 </option>
               ) : null}
-              {selectableSnapshots.map((snapshot) => (
-                <option key={snapshot.id} value={snapshot.id}>
-                  {activeTab === "resumen"
-                    ? WEEKLY_SCENARIO_LABEL
-                    : `${snapshot.nombre} · ${formatDate(snapshot.created_at)}`}
+              {scenarioOptions.map((option) => (
+                <option key={option.key} value={option.key}>
+                  {option.label}
                 </option>
               ))}
             </select>

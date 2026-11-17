@@ -25,13 +25,49 @@ import {
   type DashboardSource,
   type OperationsRepository,
 } from "@/server/repositories/operations";
+import {
+  WEEKLY_MAIN_SNAPSHOT_ID,
+  WEEKLY_TESTING_SCENARIO_ID,
+} from "@/lib/operational-scenarios";
 import { serverLog } from "@/server/observability/request-context";
 import { ApiError } from "./errors";
+
+async function inventoryEvidenceMovements(
+  source: DashboardSource,
+  repository: OperationsRepository,
+) {
+  if (
+    source.snapshot?.escenario_id !== WEEKLY_TESTING_SCENARIO_ID ||
+    !source.snapshot.snapshot_base_id
+  ) {
+    return source.movements;
+  }
+  const testingBase = await repository.getSnapshotBundle(
+    source.snapshot.snapshot_base_id,
+  );
+  if (
+    testingBase?.metadata.snapshot_origen_id !== WEEKLY_MAIN_SNAPSHOT_ID
+  ) {
+    return source.movements;
+  }
+  const main = await repository.getSnapshotBundle(WEEKLY_MAIN_SNAPSHOT_ID);
+  if (!main) {
+    return source.movements;
+  }
+  return [
+    ...new Map(
+      [...main.movements, ...source.movements].map((movement) => [
+        movement.movimiento_id,
+        movement,
+      ]),
+    ).values(),
+  ];
+}
 
 export async function getDashboard(
   snapshotId: string,
   repository: OperationsRepository = getOperationsRepository(),
-  evaluatedAt: string = new Date().toISOString(),
+  evaluatedAt?: string,
   options?: {
     source?: DashboardSource;
     referencia_tipo?: "snapshot" | "escenario";
@@ -45,6 +81,7 @@ export async function getDashboard(
   if (!source.snapshot) {
     throw new ApiError(404, "SNAPSHOT_NOT_FOUND", "El snapshot no existe.");
   }
+  const evaluationTime = evaluatedAt ?? source.snapshot.created_at;
 
   const presentationBySku = new Map(
     source.presentations.map((presentation) => [presentation.sku_id, presentation]),
@@ -242,7 +279,11 @@ export async function getDashboard(
       ];
     },
   );
-  const temporalEvidence: AlertTemporalEvidence[] = source.movements.flatMap(
+  const evidenceMovements = await inventoryEvidenceMovements(
+    source,
+    repository,
+  );
+  const temporalEvidence: AlertTemporalEvidence[] = evidenceMovements.flatMap(
     (movement) => {
       const centerId =
         movement.tipo === "despacho"
@@ -268,7 +309,7 @@ export async function getDashboard(
   const alertas = evaluateOperationalAlerts({
     referencia_tipo: options?.referencia_tipo ?? "snapshot",
     referencia_id: options?.referencia_id ?? source.snapshot.id,
-    evaluado_en: evaluatedAt,
+    evaluado_en: evaluationTime,
     centros: centers.map((center) => ({
       centro_id: center.centro_id,
       centro_nombre: center.nombre,

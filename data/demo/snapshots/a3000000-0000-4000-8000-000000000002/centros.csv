@@ -1,0 +1,7 @@
+snapshot_id,centro_id,nombre,estado,zona,coordinador_nombre
+a3000000-0000-4000-8000-000000000002,C01,Centro Norte,activo,Norte - SIMULADO,Coordinacion Norte - SIMULADA
+a3000000-0000-4000-8000-000000000002,C02,Centro Sur,activo,Sur - SIMULADO,Coordinacion Sur - SIMULADA
+a3000000-0000-4000-8000-000000000002,C03,Centro Oriente,activo,Oriente - SIMULADO,Coordinacion Oriente - SIMULADA
+a3000000-0000-4000-8000-000000000002,C04,Centro Occidente,activo,Occidente - SIMULADO,Coordinacion Logistica - SIMULADA
+a3000000-0000-4000-8000-000000000002,C05,Centro Centro,activo,Centro - SIMULADO,Coordinacion Centro - SIMULADA
+a3000000-0000-4000-8000-000000000002,C06,Centro de apoyo complementario,activo,Corredor complementario - SIMULADO,Coordinacion Complementaria - SIMULADA

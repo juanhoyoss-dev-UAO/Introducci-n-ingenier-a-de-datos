@@ -15,13 +15,28 @@ import type {
   TravelTimeRecord,
 } from "./types";
 import { DEFAULT_ALERT_THRESHOLDS } from "@/domain/alerts";
+import {
+  WEEKLY_MAIN_LABEL,
+  WEEKLY_MAIN_SCENARIO_ID,
+  WEEKLY_MAIN_SNAPSHOT_ID,
+  WEEKLY_TESTING_LABEL,
+  WEEKLY_TESTING_SCENARIO_ID,
+} from "@/lib/operational-scenarios";
 
-export const WEEKLY_SCENARIO_ID = "65000000-0000-4000-8000-000000000001";
-export const WEEKLY_OPERATIONAL_SNAPSHOT_ID =
-  "65000000-0000-4000-8000-000000000003";
+export const WEEKLY_SCENARIO_ID = WEEKLY_MAIN_SCENARIO_ID;
+export const WEEKLY_OPERATIONAL_SNAPSHOT_ID = WEEKLY_MAIN_SNAPSHOT_ID;
 export const WEEKLY_SCENARIO_LABEL =
   "Emergencia simulada de Cali — Semana del 9 al 15 de noviembre de 2026.";
 export const ALL_PRODUCTS_FILTER = "all";
+export type OperationalScenarioKey = "main" | "testing";
+
+export interface OperationalScenarioOption<
+  T extends { id: string; created_at?: string; escenario_id?: string },
+> {
+  key: OperationalScenarioKey;
+  label: string;
+  snapshot: T;
+}
 
 export interface DashboardSummary {
   centros: number;
@@ -182,10 +197,61 @@ export function findWeeklyOperationalSnapshot<
 }
 
 export function summarySnapshotOptions<
-  T extends { id: string; escenario_id?: string },
+  T extends { id: string; created_at?: string; escenario_id?: string },
 >(snapshots: readonly T[]) {
   const weeklySnapshot = findWeeklyOperationalSnapshot(snapshots);
-  return weeklySnapshot ? [weeklySnapshot] : [];
+  const testingSnapshot = [...snapshots]
+    .filter((snapshot) => snapshot.escenario_id === WEEKLY_TESTING_SCENARIO_ID)
+    .sort(
+      (left, right) =>
+        (right.created_at ?? "").localeCompare(left.created_at ?? "") ||
+        right.id.localeCompare(left.id),
+    )[0];
+  return [weeklySnapshot, testingSnapshot].filter(
+    (snapshot): snapshot is T => Boolean(snapshot),
+  );
+}
+
+export function operationalScenarioOptions<
+  T extends { id: string; created_at?: string; escenario_id?: string },
+>(snapshots: readonly T[]): OperationalScenarioOption<T>[] {
+  const resolvedSnapshots = summarySnapshotOptions(snapshots);
+  const main = findWeeklyOperationalSnapshot(resolvedSnapshots);
+  const testing = resolvedSnapshots.find(
+    (snapshot) => snapshot.escenario_id === WEEKLY_TESTING_SCENARIO_ID,
+  );
+  return [
+    main
+      ? { key: "main" as const, label: WEEKLY_MAIN_LABEL, snapshot: main }
+      : null,
+    testing
+      ? {
+          key: "testing" as const,
+          label: WEEKLY_TESTING_LABEL,
+          snapshot: testing,
+        }
+      : null,
+  ].filter((option): option is OperationalScenarioOption<T> => option !== null);
+}
+
+export function operationalScenarioKey(snapshot: {
+  id: string;
+  escenario_id?: string;
+}): OperationalScenarioKey | null {
+  if (findWeeklyOperationalSnapshot([snapshot])) return "main";
+  if (snapshot.escenario_id === WEEKLY_TESTING_SCENARIO_ID) return "testing";
+  return null;
+}
+
+export function operationalScenarioLabel(snapshot: {
+  id: string;
+  escenario_id?: string;
+}) {
+  if (findWeeklyOperationalSnapshot([snapshot])) return WEEKLY_MAIN_LABEL;
+  if (snapshot.escenario_id === WEEKLY_TESTING_SCENARIO_ID) {
+    return WEEKLY_TESTING_LABEL;
+  }
+  return null;
 }
 
 export function operationalSummaryVisualizationState(

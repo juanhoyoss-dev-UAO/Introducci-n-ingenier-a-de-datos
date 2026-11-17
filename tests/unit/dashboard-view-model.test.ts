@@ -13,6 +13,8 @@ import {
   inventoryComparisonRows,
   inventoryRows,
   needRows,
+  operationalScenarioKey,
+  operationalScenarioOptions,
   operationalSummaryVisualizationState,
   productCoverageRows,
   resourceComparisonRows,
@@ -321,6 +323,38 @@ describe("modelo de vista del inspector D0", () => {
     );
     expect(summarySnapshotOptions(snapshots).map((snapshot) => snapshot.id)).toEqual([
       WEEKLY_OPERATIONAL_SNAPSHOT_ID,
+    ]);
+  });
+
+  it("expone MAIN y solo la versión más reciente de PRUEBAS", () => {
+    const snapshots = [
+      { id: WEEKLY_OPERATIONAL_SNAPSHOT_ID, escenario_id: WEEKLY_SCENARIO_ID, created_at: "2026-11-15T23:59:00-05:00" },
+      { id: "65000000-0000-4000-8000-000000000099", escenario_id: WEEKLY_SCENARIO_ID, created_at: "2026-11-16T11:00:00-05:00" },
+      { id: "10000000-0000-4000-8000-000000000001", escenario_id: "10000000-0000-4000-8000-000000000001", created_at: "2026-10-01T08:00:00-05:00" },
+      { id: "20000000-0000-4000-8000-000000000002", escenario_id: "20000000-0000-4000-8000-000000000002", created_at: "2026-10-02T08:00:00-05:00" },
+      { id: "a3000000-0000-4000-8000-000000000010", escenario_id: "a3000000-0000-4000-8000-000000000001", created_at: "2026-11-16T08:00:00-05:00" },
+      { id: "a3000000-0000-4000-8000-000000000011", escenario_id: "a3000000-0000-4000-8000-000000000001", created_at: "2026-11-16T09:00:00-05:00" },
+      { id: "a3000000-0000-4000-8000-000000000012", escenario_id: "a3000000-0000-4000-8000-000000000001", created_at: "2026-11-16T10:00:00-05:00" },
+    ];
+    expect(summarySnapshotOptions(snapshots).map((snapshot) => snapshot.id)).toEqual([
+      WEEKLY_OPERATIONAL_SNAPSHOT_ID,
+      "a3000000-0000-4000-8000-000000000012",
+    ]);
+    const options = operationalScenarioOptions(snapshots);
+    expect(options.map((option) => [option.key, option.label])).toEqual([
+      ["main", "Emergencia semanal — MAIN"],
+      ["testing", "Emergencia semanal — PRUEBAS"],
+    ]);
+    expect(options.map((option) => option.snapshot.id)).toEqual([
+      WEEKLY_OPERATIONAL_SNAPSHOT_ID,
+      "a3000000-0000-4000-8000-000000000012",
+    ]);
+    expect(options.map((option) => operationalScenarioKey(option.snapshot))).toEqual([
+      "main",
+      "testing",
+    ]);
+    expect(operationalScenarioOptions(snapshots.slice(4)).map((option) => option.key)).toEqual([
+      "testing",
     ]);
   });
 

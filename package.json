@@ -14,6 +14,7 @@
     "test:csv": "vitest run tests/integration/csv-repository.test.ts tests/integration/csv-safety.test.ts tests/integration/csv-validation.test.ts",
     "test:http": "vitest run tests/http",
     "scenario:weekly": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/generate-weekly-scenario.ts",
+    "scenario:testing": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/generate-testing-scenario.ts",
     "auth:hash": "node scripts/generate-admin-password-hash.mjs"
   },
   "dependencies": {
@@ -22,6 +23,7 @@
     "next": "16.4.3",
     "react": "19.3.1",
     "react-dom": "19.3.1",
+    "read-excel-file": "9.3.14",
     "zod": "4.6.7"
   },
   "devDependencies": {
@@ -33,6 +35,7 @@
     "eslint-config-next": "16.4.3",
     "tailwindcss": "^4.3.3",
     "typescript": "^5",
+    "vite": "7.2.2",
     "vitest": "5.0.5"
   }
 }

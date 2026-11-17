@@ -12,6 +12,7 @@ import {
 } from "@/server/repositories/operations";
 import { serverLog } from "@/server/observability/request-context";
 import { ApiError, RepositoryError } from "./errors";
+import { assertSnapshotWritable } from "./scenario-protection";
 
 export interface OperationalUpdateResult {
   snapshot: SnapshotRecord;
@@ -293,6 +294,7 @@ export async function applyOperationalUpdate(
   if (!source) {
     throw new ApiError(404, "SNAPSHOT_NOT_FOUND", "El snapshot no existe.");
   }
+  assertSnapshotWritable(source.metadata);
 
   const startedAt = performance.now();
   serverLog("INFO", "SERVICE", "Publicando versión operativa", {

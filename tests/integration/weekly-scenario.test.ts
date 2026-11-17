@@ -119,6 +119,32 @@ describe("escenario semanal M6.5", () => {
     ).toBe(true);
   });
 
+  it("expone estados comparables de todos los centros sin mezclarlos", async () => {
+    const analysis = await getTemporalAnalysis(
+      FINAL,
+      {
+        escenario_id: SCENARIO,
+        producto_id: "P01",
+        desde: "2026-11-09T00:00:00-05:00",
+        hasta: "2026-11-15T23:59:59-05:00",
+        corte: "2026-11-15T23:59:59-05:00",
+        perspectiva: "fisica",
+      },
+      repository(),
+    );
+    const firstInstant = analysis.series.inventario_necesidad_deficit[0]?.instante;
+    const rowsAtFirstInstant = analysis.series.inventario_necesidad_deficit.filter(
+      (row) => row.instante === firstInstant,
+    );
+
+    expect(firstInstant).toBeTruthy();
+    expect(rowsAtFirstInstant).toHaveLength(6);
+    expect(new Set(rowsAtFirstInstant.map((row) => row.centro_id)).size).toBe(6);
+    expect(new Set(rowsAtFirstInstant.map((row) => row.unidad))).toEqual(
+      new Set(["ml"]),
+    );
+  });
+
   it("calcula alertas con la hora simulada y resuelve al menos una condicion", async () => {
     const repo = repository();
     const [start, end, dashboard] = await Promise.all([
