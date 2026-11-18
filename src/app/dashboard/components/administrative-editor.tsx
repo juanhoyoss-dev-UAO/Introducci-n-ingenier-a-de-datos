@@ -67,13 +67,17 @@ function SaveButton({ saving }: { saving: boolean }) {
 export function AdministrativeEditor({
   activeTab,
   bundle,
+  initialCenterId,
   onSave,
 }: {
   activeTab: DashboardTab;
   bundle: DashboardBundle;
+  initialCenterId?: string;
   onSave: (update: OperationalUpdate) => Promise<void>;
 }) {
-  const firstCenter = bundle.centers[0];
+  const firstCenter =
+    bundle.centers.find((center) => center.centro_id === initialCenterId) ??
+    bundle.centers[0];
   const firstProduct = bundle.products[0];
   const firstPresentation = firstProduct?.presentaciones[0];
 

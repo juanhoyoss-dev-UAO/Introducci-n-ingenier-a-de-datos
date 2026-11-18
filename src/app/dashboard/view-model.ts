@@ -386,9 +386,24 @@ export function productCoverageRows(
   bundle: DashboardBundle,
   centerId: Exclude<CenterFilter, "all">,
 ): CoverageMatrixCell[] {
-  return coverageMatrixRows(bundle, centerId).filas.flatMap((row) =>
-    row.celdas.flatMap((cell) => (cell ? [cell] : [])),
-  );
+  return coverageMatrixRows(bundle, centerId)
+    .filas.flatMap((row) =>
+      row.celdas.flatMap((cell) => (cell ? [cell] : [])),
+    )
+    .sort((left, right) => {
+      if (left.cobertura_porcentaje === null) {
+        return right.cobertura_porcentaje === null
+          ? left.producto_nombre.localeCompare(right.producto_nombre, "es") ||
+              left.producto_id.localeCompare(right.producto_id)
+          : 1;
+      }
+      if (right.cobertura_porcentaje === null) return -1;
+      return (
+        left.cobertura_porcentaje - right.cobertura_porcentaje ||
+        left.producto_nombre.localeCompare(right.producto_nombre, "es") ||
+        left.producto_id.localeCompare(right.producto_id)
+      );
+    });
 }
 
 export function deriveSummary(bundle: DashboardBundle): DashboardSummary {

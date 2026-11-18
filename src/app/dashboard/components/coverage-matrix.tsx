@@ -33,7 +33,7 @@ const STATE_PRESENTATION: Record<
     legendClassName: "bg-cyan-500",
   },
   sin_necesidad: {
-    label: "Sin necesidad o N/D",
+    label: "Sin necesidad declarada",
     className: "border-slate-300 bg-slate-100 text-slate-700",
     legendClassName: "bg-slate-400",
   },
@@ -56,7 +56,7 @@ function MatrixCell({ cell }: { cell: CoverageMatrixCell | null }) {
   const presentation = STATE_PRESENTATION[cell.estado];
   const coverage =
     cell.cobertura_porcentaje === null
-      ? "N/D"
+      ? "0 %"
       : `${numberFormatter.format(cell.cobertura_porcentaje)} %`;
 
   return (

@@ -7,7 +7,6 @@ import {
   inventoryComparisonRows,
   operationalSummaryVisualizationState,
   productCoverageRows,
-  resourceComparisonRows,
   volunteerComparisonRows,
 } from "../view-model";
 import { CoverageChart } from "./coverage-chart";
@@ -15,7 +14,6 @@ import { CoverageMatrix } from "./coverage-matrix";
 import { InventoryNeedsChart } from "./inventory-needs-chart";
 import { MetricCards } from "./metric-cards";
 import { ProductCoverageChart } from "./product-coverage-chart";
-import { ResourcesChart } from "./resources-chart";
 import { VolunteerChart } from "./volunteer-chart";
 
 export function OperationalSummary({
@@ -44,7 +42,6 @@ export function OperationalSummary({
     centerFilter,
     productId,
   );
-  const resourceRows = resourceComparisonRows(bundle, centerFilter, productId);
   const volunteerRows = volunteerComparisonRows(bundle, centerFilter);
 
   return (
@@ -93,7 +90,10 @@ export function OperationalSummary({
         </div>
       </section>
 
-      <MetricCards summary={summary} />
+      <MetricCards
+        showCentersWithAttention={centerFilter === "all"}
+        summary={summary}
+      />
 
       {visualization.mostrarMatriz ? (
         <CoverageMatrix matrix={coverageMatrix} />
@@ -114,7 +114,6 @@ export function OperationalSummary({
         >
           <CoverageChart rows={coverageRows} />
           <InventoryNeedsChart rows={inventoryRows} />
-          <ResourcesChart rows={resourceRows} />
         </section>
       ) : null}
     </div>

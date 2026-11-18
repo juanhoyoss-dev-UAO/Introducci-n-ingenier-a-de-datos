@@ -11,7 +11,7 @@ import {
   type AlertType,
   type OperationalAlert,
 } from "@/contracts/types/alerts";
-import type { CenterFilter, DashboardTab } from "../types";
+import type { CenterFilter } from "../types";
 import type {
   ExcelReceptionImportResult,
   TestingScenarioResetResult,
@@ -32,6 +32,10 @@ import type {
   AlertResolutionSummary,
 } from "../alert-resolution";
 import { AlertResolutionModal } from "./alert-resolution-modal";
+import {
+  alertNavigationTarget,
+  type AlertNavigationTab,
+} from "../navigation";
 
 const severityLabels: Record<AlertSeverity, string> = {
   critica: "Crítica",
@@ -84,15 +88,6 @@ function formatObserved(alert: OperationalAlert) {
   return `${value} ${alert.unidad}`;
 }
 
-function targetTab(
-  type: AlertType,
-): Exclude<DashboardTab, "resumen" | "alertas"> {
-  if (type === "deficit_cobertura") return "necesidades";
-  if (type === "voluntariado_insuficiente") return "voluntarios";
-  if (type === "donacion_retrasada") return "donaciones";
-  return "inventario";
-}
-
 function AlertCard({
   alert,
   canResolve,
@@ -101,10 +96,7 @@ function AlertCard({
 }: {
   alert: OperationalAlert;
   canResolve: boolean;
-  onNavigate: (
-    tab: Exclude<DashboardTab, "resumen" | "alertas">,
-    centerId: string,
-  ) => void;
+  onNavigate: (tab: AlertNavigationTab, centerId: string) => void;
   onResolve: (alert: OperationalAlert) => void;
 }) {
   const isSupplyOpportunity = alert.tipo === "excedente_transferible";
@@ -186,7 +178,13 @@ function AlertCard({
       ) : (
         <button
           className="mt-4 rounded-lg border border-blue-300 px-3 py-2 text-sm font-semibold text-blue-800 transition hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
-          onClick={() => onNavigate(targetTab(alert.tipo), alert.centro_id)}
+          onClick={() => {
+            const target = alertNavigationTarget(
+              alert.tipo,
+              alert.centro_id,
+            );
+            onNavigate(target.tab, target.centerId);
+          }}
           type="button"
         >
           Ver apartado relacionado
@@ -226,10 +224,7 @@ export function AlertCenter({
     context: AlertReceptionContext,
   ) => Promise<void>;
   onResetComplete: (result: TestingScenarioResetResult) => void;
-  onNavigate: (
-    tab: Exclude<DashboardTab, "resumen" | "alertas">,
-    centerId: string,
-  ) => void;
+  onNavigate: (tab: AlertNavigationTab, centerId: string) => void;
 }) {
   const [severity, setSeverity] = useState<"all" | AlertSeverity>("all");
   const [type, setType] = useState<"all" | AlertType>("all");

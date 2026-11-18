@@ -47,10 +47,15 @@ export function CoverageChart({ rows }: { rows: CoverageByCenterPoint[] }) {
                         Menor cobertura
                       </span>
                     ) : null}
+                    {value === null ? (
+                      <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700">
+                        Sin necesidad declarada
+                      </span>
+                    ) : null}
                   </div>
                   <strong className="shrink-0 tabular-nums text-slate-950">
                     {value === null
-                      ? "No calculable"
+                      ? "0 %"
                       : `${formatChartNumber(value)} %`}
                   </strong>
                 </div>

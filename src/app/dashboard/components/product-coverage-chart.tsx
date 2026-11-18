@@ -103,7 +103,7 @@ export function ProductCoverageChart({
                     </span>
                     <strong className="min-w-16 text-right tabular-nums text-slate-950">
                       {coverage === null
-                        ? "N/D"
+                        ? "0 %"
                         : `${formatChartNumber(coverage)} %`}
                     </strong>
                   </div>

@@ -11,6 +11,7 @@ import type {
 } from "@/contracts/types/excel-receptions";
 import { logger } from "@/lib/logger";
 import type { AlertGroupId } from "./alert-groups";
+import { DASHBOARD_TABS } from "./navigation";
 import {
   buildAlertResolutionSummary,
   pendingReception,
@@ -54,19 +55,6 @@ import type {
   SnapshotRecord,
   TravelTimeRecord,
 } from "./types";
-
-const TABS: ReadonlyArray<{ id: DashboardTab; label: string }> = [
-  { id: "resumen", label: "Resumen operativo" },
-  { id: "alertas", label: "Alertas operativas" },
-  { id: "temporal", label: "Historial operativo" },
-  { id: "centros", label: "Centros" },
-  { id: "inventario", label: "Inventario" },
-  { id: "necesidades", label: "Necesidades" },
-  { id: "voluntarios", label: "Voluntarios" },
-  { id: "donaciones", label: "Donaciones esperadas" },
-  { id: "movimientos", label: "Movimientos y recepciones" },
-  { id: "tiempos", label: "Tiempos de traslado" },
-];
 
 const numberFormatter = new Intl.NumberFormat("es-CO", {
   maximumFractionDigits: 2,
@@ -973,7 +961,7 @@ export default function DashboardClient({
         <section className="mt-7">
           <div className="overflow-x-auto border-b border-slate-300" role="tablist" aria-label="Secciones de inspección">
             <div className="flex min-w-max gap-1">
-              {TABS.map((tab) => (
+              {DASHBOARD_TABS.map((tab) => (
                 <button
                   aria-controls={`panel-${tab.id}`}
                   aria-selected={activeTab === tab.id}
@@ -1003,7 +991,10 @@ export default function DashboardClient({
               <AdministrativeEditor
                 activeTab={activeTab}
                 bundle={bundle}
-                key={`${bundle.snapshot.id}-${activeTab}`}
+                initialCenterId={
+                  centerFilter === "all" ? undefined : centerFilter
+                }
+                key={`${bundle.snapshot.id}-${activeTab}-${centerFilter}`}
                 onSave={saveOperationalUpdate}
               />
             ) : null}

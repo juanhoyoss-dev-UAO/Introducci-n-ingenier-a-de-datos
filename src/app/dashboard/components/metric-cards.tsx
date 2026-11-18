@@ -1,23 +1,32 @@
 import type { OperationalSummary } from "../view-model";
 import { formatChartNumber } from "./chart-primitives";
 
-export function MetricCards({ summary }: { summary: OperationalSummary }) {
+export function MetricCards({
+  showCentersWithAttention,
+  summary,
+}: {
+  showCentersWithAttention: boolean;
+  summary: OperationalSummary;
+}) {
   const metrics = [
     { label: "Centros activos", value: summary.centrosActivos },
     { label: "Centros con déficit", value: summary.centrosConDeficit },
     { label: "Productos", value: summary.productos },
     { label: "Con necesidades", value: summary.centrosConNecesidades },
-    { label: "Donaciones pendientes", value: summary.donacionesPendientes },
     {
       label: "Con personal faltante",
       value: summary.centrosConVoluntariosFaltantes,
     },
     { label: "Alertas activas", value: summary.alertasActivas },
     { label: "Alertas críticas", value: summary.alertasCriticas },
-    {
-      label: "Centros con atención",
-      value: summary.centrosQueRequierenAtencion,
-    },
+    ...(showCentersWithAttention
+      ? [
+          {
+            label: "Centros con atención",
+            value: summary.centrosQueRequierenAtencion,
+          },
+        ]
+      : []),
   ];
 
   return (

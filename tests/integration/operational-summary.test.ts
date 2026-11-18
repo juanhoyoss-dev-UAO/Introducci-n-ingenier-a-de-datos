@@ -77,15 +77,21 @@ describe("resumen operativo del escenario semanal", () => {
       matrix.centros[0]!.centro_id,
     );
     expect(productCoverage).toHaveLength(32);
-    expect(
-      productCoverage.findIndex(
-        (row) => row.deficit_confirmado_unidad_base === 0,
-      ),
-    ).toBeGreaterThan(
-      productCoverage.findIndex(
-        (row) => row.deficit_confirmado_unidad_base > 0,
-      ),
+    const calculableCoverages = productCoverage.flatMap((row) =>
+      row.cobertura_porcentaje === null ? [] : [row.cobertura_porcentaje],
     );
+    expect(calculableCoverages).toEqual(
+      [...calculableCoverages].sort((left, right) => left - right),
+    );
+    const firstWithoutNeed = productCoverage.findIndex(
+      (row) => row.cobertura_porcentaje === null,
+    );
+    expect(firstWithoutNeed).toBeGreaterThan(-1);
+    expect(
+      productCoverage
+        .slice(firstWithoutNeed)
+        .every((row) => row.cobertura_porcentaje === null),
+    ).toBe(true);
 
     const renderSummary = (centerFilter: string, productId: string) =>
       renderToStaticMarkup(
@@ -103,6 +109,8 @@ describe("resumen operativo del escenario semanal", () => {
       "Matriz de cobertura por producto y centro",
     );
     expect(allCentersAllProducts).toContain("Disponibilidad de voluntarios");
+    expect(allCentersAllProducts).toContain("Centros con atención");
+    expect(allCentersAllProducts).not.toContain("Donaciones pendientes");
     expect(allCentersAllProducts).not.toContain(">Cobertura por centro<");
     expect(allCentersAllProducts).not.toContain(
       ">Recursos confirmados frente a esperados<",
@@ -111,6 +119,8 @@ describe("resumen operativo del escenario semanal", () => {
     const oneCenterAllProducts = renderSummary("C01", ALL_PRODUCTS_FILTER);
     expect(oneCenterAllProducts).toContain(">Cobertura por producto<");
     expect(oneCenterAllProducts).toContain("Disponibilidad de voluntarios");
+    expect(oneCenterAllProducts).not.toContain("Centros con atención");
+    expect(oneCenterAllProducts).not.toContain("Donaciones pendientes");
     expect(oneCenterAllProducts).not.toContain(
       "Matriz de cobertura por producto y centro",
     );
@@ -118,12 +128,13 @@ describe("resumen operativo del escenario semanal", () => {
       ">Recursos confirmados frente a esperados<",
     );
     expect(oneCenterAllProducts).toContain("Sin necesidad declarada");
+    expect(oneCenterAllProducts).toContain("0 %");
 
     for (const centerFilter of ["all", "C01"]) {
       const oneProduct = renderSummary(centerFilter, "P01");
       expect(oneProduct).toContain(">Cobertura por centro<");
       expect(oneProduct).toContain(">Inventario frente a necesidades<");
-      expect(oneProduct).toContain(
+      expect(oneProduct).not.toContain(
         ">Recursos confirmados frente a esperados<",
       );
       expect(oneProduct).not.toContain("Disponibilidad de voluntarios");

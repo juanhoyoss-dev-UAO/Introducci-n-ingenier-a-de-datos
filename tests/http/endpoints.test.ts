@@ -458,14 +458,22 @@ describe("HTTP real C2", () => {
 
     expect(authenticated.status).toBe(200);
     for (const section of [
+      "Resumen operativo",
+      "Alertas operativas",
       "Centros",
       "Inventario",
-      "Necesidades",
       "Voluntarios",
-      "Donaciones esperadas",
-      "Tiempos de traslado",
     ]) {
       expect(authenticatedBody).toContain(section);
+    }
+    for (const hiddenSection of [
+      "Historial operativo",
+      "Necesidades",
+      "Donaciones esperadas",
+      "Movimientos y recepciones",
+      "Tiempos de traslado",
+    ]) {
+      expect(authenticatedBody).not.toContain(hiddenSection);
     }
   });
 
