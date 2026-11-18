@@ -5,14 +5,17 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Redes de Ayuda",
-  description: "Prototipo académico de coordinación de centros de acopio",
+  description: "Plataforma de coordinación de centros de ayuda",
 };
 
-export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
+export default function RootLayout({
+  children,
+}: {
+  children: ReactNode;
+}) {
   return (
     <html lang="es">
       <body>{children}</body>
     </html>
   );
 }
-

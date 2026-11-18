@@ -836,20 +836,20 @@ export default function DashboardClient({
   }
 
   return (
-    <div className="min-h-screen bg-slate-100">
-      <header className="border-b border-slate-200 bg-slate-950 text-white">
+    <div className="min-h-screen bg-[#eef5ed]">
+      <header className="border-b border-[#2f7657] bg-[#073f31] text-white shadow-[0_12px_32px_rgba(7,63,49,0.16)]">
         <div className="mx-auto flex max-w-[1600px] flex-col gap-5 px-5 py-6 sm:px-8 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-300">Redes de Ayuda</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#c6ec99]">Redes de Ayuda</p>
             <h1 className="mt-2 text-2xl font-semibold tracking-tight">Consola administrativa</h1>
             <p className="mt-1 text-sm text-slate-300">Inspección operativa de snapshots CSV</p>
           </div>
           <div className="flex flex-wrap items-center gap-3 text-sm">
-            <div className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2">
+            <div className="rounded-lg border border-white/15 bg-white/5 px-3 py-2">
               <span className="text-slate-400">Administrador</span>{" "}
               <strong>{user.username}</strong>
             </div>
-            <div className="max-w-sm rounded-lg border border-slate-700 bg-slate-900 px-3 py-2">
+            <div className="max-w-sm rounded-lg border border-white/15 bg-white/5 px-3 py-2">
               <span className="text-slate-400">Snapshot</span>{" "}
               <strong>{bundle?.snapshot.nombre ?? "Sin cargar"}</strong>
             </div>
@@ -867,7 +867,7 @@ export default function DashboardClient({
 
       <main className="mx-auto max-w-[1600px] px-5 py-7 sm:px-8">
         <section
-          className={`grid gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm ${
+          className={`grid gap-4 rounded-xl border border-emerald-100 bg-white p-5 shadow-[0_12px_30px_rgba(7,63,49,0.07)] ${
             activeTab === "resumen" ? "md:grid-cols-2 lg:grid-cols-3" : "md:grid-cols-2"
           }`}
         >

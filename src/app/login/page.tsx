@@ -4,6 +4,7 @@ import { type FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { logger } from "@/lib/logger";
+import styles from "./login.module.css";
 
 interface SessionUser {
   username: string;
@@ -84,58 +85,143 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-100 px-6 py-16">
-      <section className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-7 shadow-sm sm:p-9">
-        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-blue-700">
-          Redes de Ayuda
-        </p>
-        <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
-          Acceso administrativo
-        </h1>
-        <p className="mt-3 text-sm leading-6 text-slate-600">
-          Inicia sesión con las credenciales locales configuradas para el
-          administrador.
-        </p>
-        {checkingSession ? (
-          <p className="mt-8 text-sm text-slate-500" role="status">
-            Verificando sesión…
-          </p>
-        ) : (
-          <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
-            <label className="block text-sm font-medium text-slate-800">
-              Usuario
-              <input
-                className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
-                name="username"
-                type="text"
-                autoComplete="username"
-                required
-              />
-            </label>
-            <label className="block text-sm font-medium text-slate-800">
-              Contraseña
-              <input
-                className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
-                name="password"
-                type="password"
-                autoComplete="current-password"
-                required
-              />
-            </label>
-            <button
-              className="w-full rounded-lg bg-slate-950 px-4 py-2.5 font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
-              type="submit"
-              disabled={loading}
-            >
-              {loading ? "Ingresando…" : "Ingresar"}
-            </button>
-            {message ? (
-              <p className="text-sm text-red-700" role="alert">
-                {message}
-              </p>
-            ) : null}
-          </form>
-        )}
+    <main className={styles.page}>
+      <div className={styles.glowLeft} aria-hidden="true" />
+      <div className={styles.glowRight} aria-hidden="true" />
+
+      <section className={styles.loginCard} aria-labelledby="login-title">
+        <aside className={styles.storyPanel}>
+          <div className={styles.ringOne} aria-hidden="true" />
+          <div className={styles.ringTwo} aria-hidden="true" />
+          <div className={styles.sparkTop} aria-hidden="true">
+            ✳
+          </div>
+
+          <header className={styles.brand}>
+            <span className={styles.brandIcon} aria-hidden="true">
+              ♡
+            </span>
+            <span>
+              <strong>Redes de Ayuda</strong>
+              <small>Conectando corazones</small>
+            </span>
+          </header>
+
+          <div className={styles.storyContent}>
+            <p className={styles.pill}>
+              <span aria-hidden="true" />
+              Juntos hacemos la diferencia
+            </p>
+            <h2>
+              Una mano
+              <br />
+              amiga puede
+              <br />
+              <em>cambiarlo</em>
+              <br />
+              todo.
+            </h2>
+            <p className={styles.storyCopy}>
+              Creamos conexiones que transforman vidas. Un espacio donde
+              ayudar, compartir y colaborar se convierte en algo
+              extraordinario.
+            </p>
+          </div>
+
+          <div className={styles.communityCards}>
+            <div className={styles.communityCard}>
+              <div className={styles.avatars} aria-hidden="true">
+                <span>☺</span>
+                <span>♥</span>
+                <span>☀</span>
+              </div>
+              <strong>La comunidad nos une</strong>
+              <small>Cada gesto cuenta.</small>
+            </div>
+            <div className={styles.hopeCard}>
+              <span aria-hidden="true">✦</span>
+              <strong>Comparte esperanza</strong>
+            </div>
+          </div>
+          <span className={styles.sparkBottom} aria-hidden="true">
+            ✦
+          </span>
+        </aside>
+
+        <div className={styles.formPanel}>
+          <div className={styles.cornerCircle} aria-hidden="true">
+            <span />
+          </div>
+          <div className={styles.formContent}>
+            <span className={styles.welcomeIcon} aria-hidden="true">
+              ♧
+            </span>
+            <p className={styles.eyebrow}>Tu comunidad te espera</p>
+            <h1 id="login-title">¡Qué bueno tenerte aquí!</h1>
+            <p className={styles.intro}>
+              Ingresa a tu espacio administrativo y sigue construyendo
+              conexiones que generan cambios positivos.
+            </p>
+
+            {checkingSession ? (
+              <div className={styles.sessionStatus} role="status">
+                <span className={styles.spinner} aria-hidden="true" />
+                Verificando sesión…
+              </div>
+            ) : (
+              <form className={styles.form} onSubmit={handleSubmit}>
+                <label className={styles.field}>
+                  <span>Nombre de usuario</span>
+                  <span className={styles.inputWrap}>
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 8a7 7 0 0 1 14 0" />
+                    </svg>
+                    <input
+                      name="username"
+                      type="text"
+                      autoComplete="username"
+                      placeholder="Escribe tu usuario"
+                      required
+                    />
+                  </span>
+                </label>
+                <label className={styles.field}>
+                  <span>Contraseña</span>
+                  <span className={styles.inputWrap}>
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M8 10V8a4 4 0 0 1 8 0v2m-9 0h10v9H7v-9Zm5 4v2" />
+                    </svg>
+                    <input
+                      name="password"
+                      type="password"
+                      autoComplete="current-password"
+                      placeholder="Escribe tu contraseña"
+                      required
+                    />
+                  </span>
+                </label>
+                <button
+                  className={styles.submitButton}
+                  type="submit"
+                  disabled={loading}
+                >
+                  <span>{loading ? "Ingresando…" : "Ingresar a mi cuenta"}</span>
+                  <span aria-hidden="true">→</span>
+                </button>
+                {message ? (
+                  <p className={styles.errorMessage} role="alert">
+                    {message}
+                  </p>
+                ) : null}
+              </form>
+            )}
+
+            <footer className={styles.footer}>
+              <p>Hecho para conectar personas y crear oportunidades.</p>
+              <strong>Redes de Ayuda · Comunidad · Solidaridad</strong>
+            </footer>
+          </div>
+        </div>
       </section>
     </main>
   );

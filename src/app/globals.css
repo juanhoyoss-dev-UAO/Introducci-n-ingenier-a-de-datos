@@ -2,13 +2,29 @@
 
 :root {
   color-scheme: light;
-  background: #f8fafc;
+  background: #eef5ed;
+  --color-blue-50: #eff8ec;
+  --color-blue-100: #e0f1d6;
+  --color-blue-200: #c8e6b7;
+  --color-blue-300: #a7d88d;
+  --color-blue-400: #80c26a;
+  --color-blue-500: #51a858;
+  --color-blue-600: #318d4d;
+  --color-blue-700: #227d4e;
+  --color-blue-800: #17613f;
+  --color-blue-900: #0e4e36;
+  --color-blue-950: #073f31;
 }
 
 body {
   margin: 0;
-  background: #f8fafc;
+  background: #eef5ed;
   color: #0f172a;
   font-family: Arial, Helvetica, sans-serif;
+}
+
+::selection {
+  background: #c6ec99;
+  color: #073f31;
 }
 
