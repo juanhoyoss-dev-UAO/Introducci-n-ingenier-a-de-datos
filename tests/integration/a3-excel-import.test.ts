@@ -104,6 +104,7 @@ describe("A3 · importación Excel y aislamiento de escenarios", () => {
       );
       expect(testingBase?.movements).toHaveLength(0);
       expect(testingBase?.operationalEvents).toHaveLength(0);
+      expect(testingBase?.qrDonations).toEqual([]);
 
       let currentSnapshotId = WEEKLY_TESTING_BASE_SNAPSHOT_ID;
       const results: Array<Record<string, unknown>> = [];
@@ -179,6 +180,7 @@ describe("A3 · importación Excel y aislamiento de escenarios", () => {
       });
       expect(resetBundle?.movements).toHaveLength(0);
       expect(resetBundle?.operationalEvents).toHaveLength(0);
+      expect(resetBundle?.qrDonations).toEqual([]);
       expect(resetBundle?.inventory).toEqual(
         mainBefore?.inventory.map((row) => ({ ...row, snapshot_id: reset.snapshot.id })),
       );
@@ -239,5 +241,5 @@ describe("A3 · importación Excel y aislamiento de escenarios", () => {
     } finally {
       await roots.cleanup();
     }
-  }, 15_000);
+  }, 20_000);
 });

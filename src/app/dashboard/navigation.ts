@@ -3,12 +3,17 @@ import type { DashboardTab } from "./types";
 
 export type VisibleDashboardTab = Extract<
   DashboardTab,
-  "resumen" | "alertas" | "centros" | "inventario" | "voluntarios"
+  | "resumen"
+  | "alertas"
+  | "centros"
+  | "inventario"
+  | "voluntarios"
+  | "donaciones"
 >;
 
 export type AlertNavigationTab = Extract<
   VisibleDashboardTab,
-  "centros" | "inventario" | "voluntarios"
+  "centros" | "inventario" | "voluntarios" | "donaciones"
 >;
 
 export const DASHBOARD_TABS: ReadonlyArray<{
@@ -20,6 +25,7 @@ export const DASHBOARD_TABS: ReadonlyArray<{
   { id: "centros", label: "Centros" },
   { id: "inventario", label: "Inventario" },
   { id: "voluntarios", label: "Voluntarios" },
+  { id: "donaciones", label: "Donaciones esperadas" },
 ];
 
 export function alertNavigationTarget(
@@ -27,7 +33,12 @@ export function alertNavigationTarget(
   centerId: string,
 ): { tab: AlertNavigationTab; centerId: string } {
   return {
-    tab: type === "voluntariado_insuficiente" ? "voluntarios" : "inventario",
+    tab:
+      type === "voluntariado_insuficiente"
+        ? "voluntarios"
+        : type === "donacion_retrasada"
+          ? "donaciones"
+          : "inventario",
     centerId,
   };
 }

@@ -42,7 +42,10 @@ function requireReference(exists: boolean, description: string) {
 }
 
 function inventoryCoordinates(operation: MovementOperation) {
-  if (operation.operation === "confirm_donation") {
+  if (
+    operation.operation === "confirm_donation" ||
+    operation.operation === "confirm_qr_donation"
+  ) {
     return null;
   }
   return operation.values;
@@ -65,6 +68,12 @@ function matchesExistingMovement(
     return (
       movement.tipo === "recepcion_confirmada" &&
       movement.intencion_id === operation.values.intencion_id
+    );
+  }
+  if (operation.operation === "confirm_qr_donation") {
+    return (
+      movement.tipo === "recepcion_confirmada" &&
+      movement.intencion_id === operation.values.anuncio_id
     );
   }
   const values = inventoryCoordinates(operation);
@@ -201,6 +210,61 @@ function createMovementVersion(
       intencion_id: donation.intencion_id,
       snapshot_origen_id: sourceSnapshotId,
       cantidad_anunciada_paquetes: donation.cantidad_paquetes,
+    };
+  } else if (operation.operation === "confirm_qr_donation") {
+    const donation = next.qrDonations.find(
+      (row) => row.anuncio_id === operation.values.anuncio_id,
+    );
+    requireReference(Boolean(donation), `el anuncio ${operation.values.anuncio_id}`);
+    if (
+      !donation ||
+      donation.estado === "cancelado" ||
+      donation.estado === "recibido_completo"
+    ) {
+      throw new ApiError(
+        409,
+        "QR_DONATION_NOT_PENDING",
+        "El anuncio seleccionado no tiene recursos pendientes.",
+      );
+    }
+    if (operation.values.cantidad_paquetes > donation.cantidad_pendiente_paquetes) {
+      throw new ApiError(
+        409,
+        "QR_DONATION_EXCEEDS_PENDING",
+        "La recepción supera la cantidad pendiente del anuncio.",
+      );
+    }
+    const presentation = next.presentations.find(
+      (row) => row.sku_id === donation.sku_id,
+    );
+    requireReference(Boolean(presentation), `la presentación ${donation.sku_id}`);
+    changeInventory(
+      next,
+      donation.centro_id,
+      donation.sku_id,
+      operation.values.cantidad_paquetes,
+    );
+    donation.cantidad_recibida_paquetes += operation.values.cantidad_paquetes;
+    donation.cantidad_pendiente_paquetes -= operation.values.cantidad_paquetes;
+    donation.estado =
+      donation.cantidad_pendiente_paquetes === 0
+        ? "recibido_completo"
+        : "parcialmente_recibido";
+    movement = {
+      snapshot_id: nextId,
+      movimiento_id: movementIdForOperation(operationId),
+      operacion_id: operationId,
+      tipo: "recepcion_confirmada",
+      centro_origen_id: null,
+      centro_destino_id: donation.centro_id,
+      producto_id: donation.producto_id,
+      sku_id: donation.sku_id,
+      cantidad_paquetes: operation.values.cantidad_paquetes,
+      ocurrido_en: operation.values.ocurrido_en,
+      registrado_en: registeredAt,
+      intencion_id: donation.anuncio_id,
+      snapshot_origen_id: sourceSnapshotId,
+      cantidad_anunciada_paquetes: donation.cantidad_anunciada_paquetes,
     };
   } else {
     const values = operation.values;

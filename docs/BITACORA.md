@@ -1,5 +1,116 @@
 # Bitácora técnica
 
+## 2026-11-19 - Fase 2.2 (preparación local multiproducto)
+
+- Adoptada una migración retrocompatible sin un segundo CSV: una fila por artículo, respuesta compartida como cabecera lógica e identidad estable por artículo.
+- Añadida creación atómica de donaciones de uno a cinco productos diferentes, compatibilidad con `create_announcement` y cálculo del estado general desde los artículos.
+- Adaptado el lector para aceptar tanto el esquema histórico A:H como el multiproducto A:J, validar cabeceras compartidas, pares producto/cantidad e identidades de artículo.
+- Agrupado el dashboard por donación con detalle expandible y recepción independiente por artículo, sin sumar unidades incompatibles.
+- Preparado el Apps Script para reutilizar el formulario, retitular el primer par sin borrar respuestas, añadir cuatro pares opcionales, insertar dos columnas en la hoja normalizada y detenerse si algún enlace QR cambia.
+- Pruebas dirigidas de Google/QR: 20/20. Pruebas CSV: 28/28. Lint, typecheck y sintaxis del script: aprobados.
+- Google Forms y Sheets no fueron modificados en este microbloque; se requiere autorización antes de ejecutar el script real.
+
+## 2026-11-19 - Fase 2.1 (conexión real Google Sheets → Next.js)
+
+### Implementación y seguridad
+
+- Creada una cuenta de servicio exclusiva para lectura, con Google Sheets API habilitada y acceso de lector únicamente al libro de respuestas.
+- Guardado el JSON en una ruta absoluta externa al repositorio; ningún valor privado fue copiado a código, documentación o salidas de prueba.
+- Retirado `.env.local` del índice de Git sin borrar el archivo local. La configuración nueva quedó en `.env.development.local`, ignorado por las reglas existentes y cargado por Next.js durante desarrollo.
+- Configurados el ID real del libro, el rango `'Respuestas normalizadas'!A:H`, la ruta externa de credenciales y el intervalo de 45 segundos.
+
+### Sincronización real autorizada
+
+- Resuelta la última versión lógica de PRUEBAS: `842d768a-44f3-55c1-b0fb-4092cb4da1db`.
+- Leída la respuesta real C01 / FRIJOL-5000 / 5 paquetes y publicada en `2485361d-0221-5be5-a4ff-0d1d7d33cf7d` como anuncio de Google Forms.
+- Resultado persistido: cinco paquetes anunciados, cero recibidos, cinco pendientes y estado `anunciado`.
+- El inventario confirmado y los movimientos conservaron sus valores operativos; la reidentificación de `snapshot_id` corresponde al versionado inmutable normal.
+- MAIN permaneció idéntico. La segunda sincronización resolvió la respuesta como duplicada y no publicó otro snapshot.
+
+### Verificaciones
+
+- JSON externo presente y con estructura válida de cuenta de servicio, sin imprimir correo, clave privada ni tokens.
+- Pruebas unitarias iniciales: 20 archivos, 103/103.
+- Prueba real temporal: primera ejecución publicó correctamente y detectó una expectativa demasiado estricta sobre `snapshot_id`; corregido el arnés, la repetición aprobó y confirmó idempotencia. El archivo temporal fue eliminado.
+- Pruebas permanentes dirigidas de configuración, traducción, sincronización y módulo QR: 5 archivos, 14/14.
+- Lectura real no mutante del módulo Donaciones esperadas: 1/1; integración activa, intervalo de 45 segundos y anuncio C01/FRIJOL-5000 visible.
+- `npm run lint`: aprobado.
+- `npm run typecheck`: aprobado.
+- Pendiente de seguridad ajeno a la conexión: rotar las credenciales administrativas que estuvieron versionadas históricamente antes de distribuir el repositorio.
+- Sin commit, push, merge, rebase ni PDF.
+
+## 2026-11-18 - Fase 2, Bloque 2 (preparación técnica)
+
+### Objetivo
+
+Preparar la conexión oficial entre Google Forms, Google Sheets y Donaciones esperadas, manteniendo MAIN inmutable y sin convertir anuncios en inventario.
+
+### Implementación
+
+- Creada una hoja nativa de Google, con catálogo M6.5 de seis centros, 32 productos y 40 presentaciones, pestañas de guía y configuración, y locale/zona horaria de Colombia.
+- Añadido un adaptador de Google Sheets que obtiene un token JWT de cuenta de servicio con alcance de solo lectura, exige el JSON fuera del repositorio y no registra credenciales.
+- Añadida traducción estricta de respuestas: encabezados conocidos, ID estable de Forms, fechas de `America/Bogota`, paquetes enteros positivos y resolución del producto a partir del SKU real del snapshot.
+- Añadido un servicio idempotente que importa filas válidas secuencialmente sobre PRUEBAS, reporta duplicados y filas inválidas, publica versiones inmutables y bloquea MAIN antes de consultar el proveedor externo.
+- Añadida ruta administrativa de sincronización y controles de interfaz manual/periódica, con intervalo configurable de 30 a 60 segundos y actualización automática de la versión lógica PRUEBAS.
+- Preparado un Apps Script acotado e idempotente para crear/publicar el formulario, vincular respuestas, conservar el ID real, generar una hoja normalizada y producir seis enlaces prerrellenados por centro.
+- Ejecutado el Apps Script con autorización del usuario. El primer intento falló al consultar un destino aún inexistente; se corrigió ese estado inicial y la repetición creó correctamente la vinculación, el disparador, la hoja normalizada y los seis enlaces.
+- Generados `QR-C01.png` a `QR-C06.png` con las URLs devueltas por Google y una página HTML responsiva e imprimible para su presentación.
+- Añadida la guía de autorización y cuenta de servicio. No se añadieron claves, correos privados ni tokens; `.env.local` no fue alterado.
+
+### Verificaciones reales
+
+- Filas válidas e inválidas de Forms: traducción, fechas, centro, SKU, cantidades y cabeceras comprobadas.
+- Sincronización en PRUEBAS: 1 anuncio importado, 1 fila de SKU inexistente aislada, inventario sin cambios y segundo intento reconocido como duplicado sin publicar otra versión.
+- MAIN rechazó la sincronización antes de invocar al lector externo.
+- Configuración: credenciales relativas o dentro del repositorio rechazadas; intervalos fuera de 30–60 segundos vuelven al valor seguro de 45 segundos.
+- Pruebas dirigidas Google + módulo QR: 5 archivos, 14/14.
+- `npm run lint`: aprobado.
+- `npm run typecheck`: aprobado.
+- La hoja Google fue verificada por tipo nativo, metadatos, rangos, conteos y previsualizaciones del libro fuente.
+- La ejecución de Apps Script terminó correctamente e informó seis enlaces por centro. La lectura posterior confirmó las pestañas `Respuestas de formulario 1`, `Respuestas normalizadas` y `Enlaces QR`, además del formulario publicado.
+- Los seis PNG QR existen y la inspección visual confirmó una matriz nítida, margen blanco y color verde de alto contraste.
+
+### Pendientes y bloqueo externo
+
+- Crear una cuenta de servicio, compartir la hoja como lector y configurar el archivo JSON fuera del repositorio.
+- Realizar un envío real del formulario y una sincronización desde PRUEBAS solamente después de configurar la credencial lectora; esta demostración corresponde al Bloque 3 y no fue iniciada.
+- Retirar `.env.local` del índice y rotar secretos antes de usar configuración sensible. `.gitignore` no desrastrea archivos ya versionados.
+- Bloque 3 no iniciado. No se generó PDF; no se hizo commit, push, merge ni rebase.
+
+## 2026-11-18 - Fase 2, Bloque 1
+
+### Objetivo
+
+Implementar el módulo local de anuncios de donación y su confirmación física, sin depender todavía de Google Forms o Google Sheets.
+
+### Implementación
+
+- Añadido un contrato estricto para anuncios QR con identificador de origen, catálogo real, cantidades, fechas, fuente y estados `anunciado`, `parcialmente_recibido`, `recibido_completo` y `cancelado`.
+- Añadido `donaciones_qr.csv` opcional para lectura retrocompatible y obligatorio al publicar versiones nuevas; no se modificaron snapshots demostrativos ni eventos M6.5.
+- Añadido un servicio y una ruta administrativa para consultar, crear y cancelar anuncios con referencias válidas e idempotencia por respuesta de origen y UUID de operación.
+- Extendida la recepción M4 con `confirm_qr_donation`: inventario, saldo del anuncio y movimiento se publican juntos en un snapshot nuevo; los excesos y las cancelaciones posteriores a una recepción se rechazan.
+- Restaurada la pestaña Donaciones esperadas con indicadores por centro, filtros, comparación en unidad base, orden, tabla y acciones parciales/completas/cancelación. MAIN solo muestra datos; PRUEBAS permite operar.
+- Política de reinicio: la acción explícita existente para reiniciar PRUEBAS desde MAIN crea una rama QR vacía. Las ramas anteriores no se eliminan y conservan anuncio y movimientos enlazados, evitando registros huérfanos.
+
+### Verificaciones reales
+
+- Caso C01/AGUA-600: anuncio de 20 paquetes no alteró inventario; recepción de 8 agregó 4.800 ml y dejó 12 pendientes; recepción restante completó 12.000 ml totales.
+- Reintentos de anuncio y recepción no duplicaron filas ni existencias; una recepción mayor al saldo fue rechazada.
+- Cancelación previa a recepción aprobada; cancelación posterior rechazada; MAIN rechazó mutaciones y el reinicio dejó la rama nueva sin anuncios QR.
+- Un caso P27/C01 confirmó que el anuncio no resolvía la alerta y que la entrega física completa sí la eliminaba al recalcular el dashboard.
+- `npm run test:unit`: 18 archivos, 97/97.
+- `npm run test:csv`: 3 archivos, 36/36.
+- Pruebas dirigidas de módulo, A4 y navegación: 4 archivos, 11/11.
+- Compatibilidad A3 + módulo QR: 2 archivos, 5/5. Una primera ejecución combinada agotó por milisegundos el límite histórico de 15 s de la secuencia A3; al incluir el nuevo CSV por snapshot se elevó únicamente ese margen a 20 s y la repetición terminó en 17,11 s.
+- `npm run lint` y `npm run typecheck`: aprobados.
+- No se ejecutaron HTTP completo, build ni verificación interactiva de navegador.
+
+### Pendientes
+
+- Bloque 2: autorización y configuración real de Google Forms, Google Sheets, cuenta de servicio, enlaces prerrellenados, QR y sincronización.
+- Bloque 3: demostración integral solo después de confirmar la conexión real a Google.
+- No se generó PDF; no se hizo commit, push, merge ni rebase.
+
 ## 2026-11-16 - Bloque A4.2
 
 ### Objetivo

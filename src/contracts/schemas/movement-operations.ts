@@ -43,6 +43,19 @@ export const movementOperationSchema = z.discriminatedUnion("operation", [
     .strict(),
   z
     .object({
+      operation: z.literal("confirm_qr_donation"),
+      values: z
+        .object({
+          operacion_id: operationIdSchema,
+          anuncio_id: z.string().uuid().transform((value) => value.toLowerCase()),
+          cantidad_paquetes: packageQuantitySchema,
+          ocurrido_en: occurredAtSchema,
+        })
+        .strict(),
+    })
+    .strict(),
+  z
+    .object({
       operation: z.literal("dispatch"),
       values: inventoryMovementValuesSchema,
     })

@@ -26,7 +26,11 @@ yarn-error.log*
 pnpm-debug.log*
 
 # Local environment variables (never version secrets)
+.env
+.env.*
 !.env.example
+google-service-account*.json
+google-credentials*.json
 
 # Vercel
 .vercel

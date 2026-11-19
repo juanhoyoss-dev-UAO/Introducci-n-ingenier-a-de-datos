@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { operationalTemporalPayloadSchema } from "./temporal";
+import { qrDonationCsvRowSchema } from "./qr-donations";
 
 const canonicalNumberPattern = /^[+-]?(?:\d+(?:\.\d+)?|\.\d+)$/;
 const uuidSchema = z.string().uuid().transform((value) => value.toLowerCase());
@@ -242,6 +243,7 @@ const snapshotBundleBaseSchema = z
     volunteers: z.array(volunteerCsvRowSchema),
     travelTimes: z.array(travelTimeCsvRowSchema),
     expectedDonations: z.array(expectedDonationCsvRowSchema),
+    qrDonations: z.array(qrDonationCsvRowSchema),
     movements: z.array(movementCsvRowSchema),
     operationalEvents: z.array(operationalEventCsvRowSchema),
   })
@@ -303,6 +305,7 @@ export const snapshotBundleSchema = snapshotBundleBaseSchema.superRefine(
       ["volunteers", bundle.volunteers],
       ["travelTimes", bundle.travelTimes],
       ["expectedDonations", bundle.expectedDonations],
+      ["qrDonations", bundle.qrDonations],
       ["movements", bundle.movements],
       ["operationalEvents", bundle.operationalEvents],
     ];
@@ -373,6 +376,13 @@ export const snapshotBundleSchema = snapshotBundleBaseSchema.superRefine(
       (row) => row.intencion_id,
       "expectedDonations",
       "intención",
+      context,
+    );
+    reportDuplicate(
+      bundle.qrDonations,
+      (row) => row.anuncio_id,
+      "qrDonations",
+      "anuncio QR",
       context,
     );
     reportDuplicate(
@@ -506,9 +516,93 @@ export const snapshotBundleSchema = snapshotBundleBaseSchema.superRefine(
       );
     });
 
-    const intentionIds = new Set(
-      bundle.expectedDonations.map((row) => row.intencion_id),
-    );
+    bundle.qrDonations.forEach((row, index) => {
+      reportMissingReference(
+        centerIds.has(row.centro_id),
+        "qrDonations",
+        index,
+        "centro_id",
+        `centro ${row.centro_id}`,
+        context,
+      );
+      reportMissingReference(
+        productIds.has(row.producto_id),
+        "qrDonations",
+        index,
+        "producto_id",
+        `producto ${row.producto_id}`,
+        context,
+      );
+      reportMissingReference(
+        skuIds.has(row.sku_id),
+        "qrDonations",
+        index,
+        "sku_id",
+        `SKU ${row.sku_id}`,
+        context,
+      );
+      const presentation = bundle.presentations.find(
+        (item) => item.sku_id === row.sku_id,
+      );
+      if (presentation && presentation.producto_id !== row.producto_id) {
+        context.addIssue({
+          code: "custom",
+          path: ["qrDonations", index, "producto_id"],
+          message: "El producto del anuncio no coincide con su presentación.",
+        });
+      }
+    });
+
+    const qrDonationGroups = new Map<
+      string,
+      Array<(typeof bundle.qrDonations)[number] & { index: number }>
+    >();
+    bundle.qrDonations.forEach((row, index) => {
+      const group = qrDonationGroups.get(row.respuesta_origen_id) ?? [];
+      group.push({ ...row, index });
+      qrDonationGroups.set(row.respuesta_origen_id, group);
+    });
+    for (const rows of qrDonationGroups.values()) {
+      const first = rows[0];
+      if (!first) continue;
+      if (rows.length > 5) {
+        context.addIssue({
+          code: "custom",
+          path: ["qrDonations", first.index, "respuesta_origen_id"],
+          message: "Una donación no puede contener más de cinco artículos.",
+        });
+      }
+      const productIds = new Set<string>();
+      for (const row of rows) {
+        if (
+          row.centro_id !== first.centro_id ||
+          row.registrado_en !== first.registrado_en ||
+          row.llegada_estimada !== first.llegada_estimada ||
+          row.donante_referencia !== first.donante_referencia ||
+          row.observaciones !== first.observaciones ||
+          row.fuente !== first.fuente
+        ) {
+          context.addIssue({
+            code: "custom",
+            path: ["qrDonations", row.index, "respuesta_origen_id"],
+            message: "Los artículos de una donación no comparten la misma cabecera.",
+          });
+        }
+        if (productIds.has(row.producto_id)) {
+          context.addIssue({
+            code: "custom",
+            path: ["qrDonations", row.index, "producto_id"],
+            message: "Una donación no puede repetir el mismo producto.",
+          });
+        }
+        productIds.add(row.producto_id);
+      }
+    }
+
+    const intentionIds = new Set([
+      ...bundle.expectedDonations.map((row) => row.intencion_id),
+      ...bundle.qrDonations.map((row) => row.anuncio_id),
+    ]);
     bundle.movements.forEach((row, index) => {
       reportMissingReference(
         productIds.has(row.producto_id),

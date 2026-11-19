@@ -463,13 +463,13 @@ describe("HTTP real C2", () => {
       "Centros",
       "Inventario",
       "Voluntarios",
+      "Donaciones esperadas",
     ]) {
       expect(authenticatedBody).toContain(section);
     }
     for (const hiddenSection of [
       "Historial operativo",
       "Necesidades",
-      "Donaciones esperadas",
       "Movimientos y recepciones",
       "Tiempos de traslado",
     ]) {

@@ -69,6 +69,7 @@ function baseBundle(): SnapshotBundle {
     ],
     travelTimes: [],
     expectedDonations: [],
+    qrDonations: [],
     movements: [],
     operationalEvents: [],
   };

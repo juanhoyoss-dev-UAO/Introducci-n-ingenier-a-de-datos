@@ -16,6 +16,7 @@ import {
   volunteerCsvRowSchema,
   type SnapshotBundle,
 } from "@/contracts/schemas/data";
+import { qrDonationCsvRowSchema } from "@/contracts/schemas/qr-donations";
 import {
   serverLog,
   shouldLogSnapshotBundle,
@@ -145,6 +146,7 @@ async function readSnapshotBundleData(
     volunteersText,
     travelTimesText,
     expectedDonationsText,
+    qrDonationsText,
     movementsText,
     operationalEventsText,
   ] = await Promise.all([
@@ -156,6 +158,7 @@ async function readSnapshotBundleData(
     readTextFile(snapshotDirectory, CSV_FILE_NAMES.volunteers),
     readTextFile(snapshotDirectory, CSV_FILE_NAMES.travelTimes),
     readTextFile(snapshotDirectory, CSV_FILE_NAMES.expectedDonations),
+    readOptionalTextFile(snapshotDirectory, CSV_FILE_NAMES.qrDonations),
     readOptionalTextFile(snapshotDirectory, CSV_FILE_NAMES.movements),
     readOptionalTextFile(
       snapshotDirectory,
@@ -193,6 +196,14 @@ async function readSnapshotBundleData(
       CSV_COLUMNS.expectedDonations,
       expectedDonationCsvRowSchema,
     ),
+    qrDonations:
+      qrDonationsText === null
+        ? []
+        : parseCsvRows(
+            qrDonationsText,
+            CSV_COLUMNS.qrDonations,
+            qrDonationCsvRowSchema,
+          ),
     movements:
       movementsText === null
         ? []
@@ -235,6 +246,7 @@ export async function readSnapshotBundle(
           CSV_FILE_NAMES.volunteers,
           CSV_FILE_NAMES.travelTimes,
           CSV_FILE_NAMES.expectedDonations,
+          CSV_FILE_NAMES.qrDonations,
           CSV_FILE_NAMES.movements,
           CSV_FILE_NAMES.operationalEvents,
         ].join(","),
@@ -248,6 +260,7 @@ export async function readSnapshotBundle(
           `${CSV_FILE_NAMES.volunteers}:${bundle.volunteers.length}`,
           `${CSV_FILE_NAMES.travelTimes}:${bundle.travelTimes.length}`,
           `${CSV_FILE_NAMES.expectedDonations}:${bundle.expectedDonations.length}`,
+          `${CSV_FILE_NAMES.qrDonations}:${bundle.qrDonations.length}`,
           `${CSV_FILE_NAMES.movements}:${bundle.movements.length}`,
           `${CSV_FILE_NAMES.operationalEvents}:${bundle.operationalEvents.length}`,
         ].join(","),
@@ -314,6 +327,10 @@ export async function writeSnapshotBundle(
   await writeExclusive(
     resolveWithin(snapshotDirectory, CSV_FILE_NAMES.expectedDonations),
     stringifyCsvRows(bundle.expectedDonations, CSV_COLUMNS.expectedDonations),
+  );
+  await writeExclusive(
+    resolveWithin(snapshotDirectory, CSV_FILE_NAMES.qrDonations),
+    stringifyCsvRows(bundle.qrDonations, CSV_COLUMNS.qrDonations),
   );
   await writeExclusive(
     resolveWithin(snapshotDirectory, CSV_FILE_NAMES.movements),

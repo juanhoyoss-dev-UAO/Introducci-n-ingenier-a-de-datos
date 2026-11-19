@@ -5,10 +5,15 @@ import { useRouter } from "next/navigation";
 
 import type { OperationalUpdate } from "@/contracts/schemas/operational-updates";
 import type { MovementOperation } from "@/contracts/schemas/movement-operations";
+import type { QrDonationOperation } from "@/contracts/schemas/qr-donations";
 import type {
   ExcelReceptionImportResult,
   TestingScenarioResetResult,
 } from "@/contracts/types/excel-receptions";
+import type {
+  QrDonationOperationResult,
+  QrDonationSyncResult,
+} from "@/contracts/types/qr-donations";
 import { logger } from "@/lib/logger";
 import type { AlertGroupId } from "./alert-groups";
 import { DASHBOARD_TABS } from "./navigation";
@@ -23,11 +28,11 @@ import { AlertCenter } from "./components/alert-center";
 import { DashboardStatus } from "./components/dashboard-status";
 import { OperationalSummary } from "./components/operational-summary";
 import { MovementEditor } from "./components/movement-editor";
+import { QrDonationsModule } from "./components/qr-donations-module";
 import { TemporalEvolution } from "./components/temporal-evolution";
 import {
   ALL_PRODUCTS_FILTER,
   centerRows,
-  donationRows,
   findWeeklyOperationalSnapshot,
   inventoryRows,
   needRows,
@@ -58,10 +63,6 @@ import type {
 
 const numberFormatter = new Intl.NumberFormat("es-CO", {
   maximumFractionDigits: 2,
-});
-const dateFormatter = new Intl.DateTimeFormat("es-CO", {
-  dateStyle: "medium",
-  timeStyle: "short",
 });
 
 class ApiClientError extends Error {
@@ -135,11 +136,6 @@ async function postApi<T>(url: string, payload: unknown): Promise<T> {
 function formatUnits(value: number, unit: "ml" | "g" | "unidad") {
   const suffix = unit === "unidad" && value !== 1 ? "unidades" : unit;
   return `${numberFormatter.format(value)} ${suffix}`;
-}
-
-function formatDate(value: string) {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : dateFormatter.format(date);
 }
 
 function TableFrame({
@@ -415,10 +411,6 @@ export default function DashboardClient({
       bundle ? volunteerRows(bundle.dashboard.centros, centerFilter) : [],
     [bundle, centerFilter],
   );
-  const filteredDonations = useMemo(
-    () => (bundle ? donationRows(bundle, centerFilter) : []),
-    [bundle, centerFilter],
-  );
   const filteredTravelTimes = useMemo(
     () =>
       bundle ? travelTimeRows(bundle.travelTimes, centerFilter) : [],
@@ -624,6 +616,57 @@ export default function DashboardClient({
     return result;
   }
 
+  async function saveQrDonationOperation(update: QrDonationOperation) {
+    const sourceSnapshotId = selectedSnapshotId;
+    setError("");
+    setMutationNotice("");
+    const result = await postApi<QrDonationOperationResult>(
+      `/api/snapshots/${encodeURIComponent(sourceSnapshotId)}/qr-donations`,
+      update,
+    );
+    if (result.source_snapshot_id !== sourceSnapshotId) {
+      throw new ApiClientError(
+        409,
+        "SNAPSHOT_MISMATCH",
+        "La versión publicada no corresponde al snapshot seleccionado.",
+      );
+    }
+    selectPublishedSnapshot(
+      result.snapshot,
+      result.idempotent
+        ? "El anuncio ya tenía ese estado; se recargó su versión operativa."
+        : "Anuncio actualizado. Se creó y seleccionó una nueva versión operativa.",
+    );
+  }
+
+  async function syncQrDonations() {
+    const sourceSnapshotId = selectedSnapshotId;
+    const result = await postApi<QrDonationSyncResult>(
+      `/api/snapshots/${encodeURIComponent(sourceSnapshotId)}/qr-donations/sync`,
+      {},
+    );
+    if (result.source_snapshot_id !== sourceSnapshotId) {
+      throw new ApiClientError(
+        409,
+        "SNAPSHOT_MISMATCH",
+        "La sincronización no corresponde al snapshot seleccionado.",
+      );
+    }
+    if (result.snapshot.id !== sourceSnapshotId) {
+      selectPublishedSnapshot(
+        result.snapshot,
+        `${result.donaciones_importadas} donación(es) y ${result.articulos_importados} artículo(s) importados desde Google Sheets.`,
+      );
+    } else {
+      setMutationNotice(
+        result.filas_invalidas.length > 0
+          ? `Sin anuncios nuevos. ${result.filas_invalidas.length} fila(s) requieren revisión.`
+          : "Google Sheets está al día; no se duplicaron anuncios.",
+      );
+    }
+    return result;
+  }
+
   async function saveAlertReception(
     update: MovementOperation,
     context: AlertReceptionContext,
@@ -774,23 +817,16 @@ export default function DashboardClient({
 
     if (activeTab === "donaciones") {
       return (
-        <TableFrame
-          headers={["Intención", "Centro", "Producto", "Presentación", "Paquetes", "Total anunciado", "Llegada", "Estado"]}
-          empty={filteredDonations.length === 0}
-        >
-          {filteredDonations.map((row) => (
-            <tr key={row.intencion_id}>
-              <td className="px-4 py-3"><Identifier>{row.intencion_id}</Identifier></td>
-              <td className="whitespace-nowrap px-4 py-3">{row.centro_nombre}<br /><Identifier>{row.centro_id}</Identifier></td>
-              <td className="whitespace-nowrap px-4 py-3">{row.producto_nombre}</td>
-              <td className="whitespace-nowrap px-4 py-3">{row.presentacion_nombre}<br /><Identifier>{row.sku_id}</Identifier></td>
-              <td className="px-4 py-3 tabular-nums">{numberFormatter.format(row.cantidad_paquetes)}</td>
-              <td className="whitespace-nowrap px-4 py-3 font-semibold tabular-nums text-blue-700">{formatUnits(row.total_unidad_base, row.unidad_base)}</td>
-              <td className="whitespace-nowrap px-4 py-3">{formatDate(row.llegada_prevista)}</td>
-              <td className="px-4 py-3">{row.estado}</td>
-            </tr>
-          ))}
-        </TableFrame>
+        <QrDonationsModule
+          centerFilter={centerFilter}
+          key={`${bundle.snapshot.id}-${centerFilter}`}
+          onCancel={saveQrDonationOperation}
+          onReceive={async (update) => {
+            await saveMovement(update);
+          }}
+          onSync={syncQrDonations}
+          snapshot={bundle.snapshot}
+        />
       );
     }
 

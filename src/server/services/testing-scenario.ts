@@ -53,6 +53,7 @@ export async function resetTestingScenario(
   };
   next.movements = [];
   next.operationalEvents = [];
+  next.qrDonations = [];
   reidentifySnapshot(next, nextId);
   const validated = snapshotBundleSchema.parse(next);
   try {

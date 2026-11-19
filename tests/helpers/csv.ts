@@ -72,6 +72,7 @@ export function reidentifyBundle(
     bundle.volunteers,
     bundle.travelTimes,
     bundle.expectedDonations,
+    bundle.qrDonations,
     bundle.movements,
   ]) {
     for (const row of collection) {

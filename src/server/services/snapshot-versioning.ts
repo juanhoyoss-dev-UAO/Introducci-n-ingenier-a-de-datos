@@ -20,6 +20,7 @@ export function reidentifySnapshot(bundle: SnapshotBundle, snapshotId: string) {
     bundle.volunteers,
     bundle.travelTimes,
     bundle.expectedDonations,
+    bundle.qrDonations,
     bundle.movements,
     bundle.operationalEvents,
   ]) {

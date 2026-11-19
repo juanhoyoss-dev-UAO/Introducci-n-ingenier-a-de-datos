@@ -8,6 +8,11 @@ import type {
   MovementRecord,
 } from "../types";
 
+type EditorMovementMode = Exclude<
+  MovementOperation["operation"],
+  "confirm_qr_donation"
+>;
+
 const numberFormatter = new Intl.NumberFormat("es-CO", {
   maximumFractionDigits: 2,
 });
@@ -92,7 +97,7 @@ export function MovementEditor({
     centerFilter !== "all" && bundle.centers.some((row) => row.centro_id === centerFilter)
       ? centerFilter
       : (bundle.centers[0]?.centro_id ?? "");
-  const [mode, setMode] = useState<MovementOperation["operation"]>(
+  const [mode, setMode] = useState<EditorMovementMode>(
     pending.length > 0 ? "confirm_donation" : "direct_reception",
   );
   const [operationId, setOperationId] = useState(newOperationId);
@@ -224,7 +229,7 @@ export function MovementEditor({
               <select
                 className={formClass()}
                 onChange={(event) => {
-                  const nextMode = event.target.value as MovementOperation["operation"];
+                  const nextMode = event.target.value as EditorMovementMode;
                   setMode(nextMode);
                   if (nextMode === "confirm_donation") {
                     setQuantity(String(selectedDonation?.cantidad_paquetes ?? 1));

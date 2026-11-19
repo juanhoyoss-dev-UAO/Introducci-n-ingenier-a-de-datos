@@ -1,5 +1,43 @@
 # Estado del proyecto
 
+## Checkpoint Fase 2.2 — multiproducto preparado localmente; Google pendiente de autorización
+
+- Modelo retrocompatible: `donaciones_qr.csv` conserva una fila por artículo; `respuesta_origen_id` agrupa la donación y `anuncio_id` permanece como identidad estable del artículo. El anuncio monoproducto existente conserva su identificador.
+- Atomicidad: una respuesta de Forms crea de uno a cinco artículos en una sola versión; el reintento compara la donación completa y no duplica filas.
+- Recepción: cada artículo reutiliza la operación atómica existente, limita la cantidad al saldo pendiente y recalcula inventario, cobertura y alertas solamente al confirmar la entrega física.
+- Interfaz: donaciones agrupadas y expandibles, estado general derivado de sus artículos, filtros por centro/producto/estado y cantidades separadas por producto y unidad.
+- Google preparado, no ejecutado: el Apps Script reutiliza el formulario, preserva preguntas y respuestas, añade cuatro pares opcionales, migra la hoja normalizada de A:H a A:J insertando columnas y bloquea la escritura si cambian los enlaces QR.
+- Verificaciones locales: 20/20 pruebas de Google/QR, 28/28 pruebas CSV, lint, typecheck y análisis sintáctico del Apps Script aprobados.
+- Pendiente: autorización expresa para modificar el formulario y la hoja reales; después deben comprobarse una donación real de tres artículos y una recepción parcial por artículo. Fase 2.2 aún no terminada.
+
+## Checkpoint Fase 2.1 — conexión real Google Sheets → Next.js completada
+
+- Estado: Google Forms publicado, hoja vinculada, seis enlaces prerrellenados, seis PNG QR reales y sincronización autenticada desde Next.js operativos.
+- Recurso Google: `Redes de Ayuda — Respuestas de donaciones`, con seis centros, 32 productos y 40 presentaciones reales de M6.5, guía y configuración operativa.
+- Integración: lectura oficial de Sheets con JWT de cuenta de servicio, alcance `spreadsheets.readonly`, credencial absoluta fuera del repositorio y sincronización manual o periódica entre 30 y 60 segundos.
+- Idempotencia: cada respuesta usa el ID real de Google Forms como identidad estable; los reintentos no duplican anuncios ni inventario y las filas inválidas se aíslan sin detener las demás.
+- Protección: MAIN se rechaza antes de consultar Google; PRUEBAS publica versiones inmutables y conserva los anuncios separados del inventario hasta una recepción administrativa.
+- Interfaz: `Sincronizar ahora` y actualización periódica integradas en Donaciones esperadas, con estado explícito de configuración pendiente o activa.
+- Automatización ejecutada: `scripts/google/setup-donations-form.gs` creó/publicó el formulario, lo vinculó a la hoja, instaló el disparador idempotente y generó los seis enlaces por centro. El primer intento reveló que `getDestinationId()` lanza una excepción sin destino; el manejo fue corregido y la repetición terminó correctamente.
+- QR: `data/demo/google-donations/` contiene `QR-C01.png` a `QR-C06.png` y una página HTML imprimible que identifica claramente cada centro.
+- Seguridad: cuenta de servicio lectora y JSON absoluto fuera del repositorio; configuración local ignorada por Git. `.env.local` fue retirado del índice sin borrar el archivo local. Los secretos administrativos expuestos históricamente todavía deben rotarse antes de distribuir la base.
+- Sincronización real: la respuesta C01 / FRIJOL-5000 / 5 paquetes se publicó desde Google Sheets en la versión PRUEBAS `2485361d-0221-5be5-a4ff-0d1d7d33cf7d`; permanece anunciada, con cero paquetes recibidos y cinco pendientes.
+- Integridad: inventario y movimientos no cambiaron, MAIN permaneció idéntico y la repetición fue idempotente sin crear otra versión.
+- Verificaciones: estructura de credencial válida sin exponer valores; configuración 45 s; pruebas unitarias 103/103 y ejecución real dirigida aprobada tras ajustar una comparación del arnés temporal a la reidentificación normal de filas por snapshot. Verificaciones permanentes de cierre registradas en la bitácora.
+- Sin commit, push, merge o rebase; no se generó PDF por instrucción expresa de la fase.
+
+## Checkpoint Fase 2 — Bloque 1
+
+- Estado: módulo local de Donaciones esperadas implementado; integración Google y validación integral todavía no iniciadas.
+- Modelo: los anuncios QR se almacenan separados de `intenciones.csv`, con cantidades anunciada, recibida y pendiente, cuatro estados, fuente e identificador estable de origen.
+- Persistencia: las versiones nuevas escriben `donaciones_qr.csv`; los snapshots anteriores sin ese archivo continúan cargando una colección vacía y los 352 eventos M6.5 permanecen intactos.
+- Recepción: confirmar parcial o totalmente reutiliza el servicio M4, publica una versión atómica e idempotente, actualiza inventario y permite recalcular alertas sin incorporar anuncios antes de la entrega física.
+- Interfaz: restaurada únicamente la pestaña Donaciones esperadas, con indicadores, filtros, comparación por producto/unidad, tabla, recepción parcial/completa y cancelación; MAIN se mantiene de solo lectura.
+- Política de reinicio: el reinicio explícito de PRUEBAS desde MAIN abre una rama nueva sin anuncios QR ni movimientos; las versiones anteriores permanecen inmutables y conservan sus anuncios y recepciones para trazabilidad.
+- Verificaciones: unitarias 97/97, CSV 36/36, módulo/A4/navegación 11/11 y compatibilidad A3 + módulo 5/5; lint y typecheck aprobados. Sin HTTP completo, build ni verificación interactiva.
+- Pendiente: Bloque 2 debe configurar Google Forms, Sheets, permisos, QR y sincronización real; no hay credenciales ni recursos Google conectados todavía.
+- Sin commit, push, merge o rebase; no se generó PDF por instrucción expresa de la fase.
+
 ## Checkpoint A4.2
 
 - Estado: resolución individual de alertas de déficit implementada; A4.3, A4.4 y M7 no iniciados.
